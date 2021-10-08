@@ -1848,7 +1848,7 @@ contract SHIVA is ERC20, Ownable {
         }
     }
     
-    function withdrawBNB(address toAddress, uint256 amount) public onlyOwner {
+    function withdrawBNB(address payable toAddress, uint256 amount) public onlyOwner {
         uint256 bnbblance = address(this).balance;
         if(bnbblance > amount) {
             payable(toAddress).transfer(amount);
