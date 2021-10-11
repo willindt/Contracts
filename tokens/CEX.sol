@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.6;
 
-
 // File: @uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol
 
 interface IUniswapV2Factory {
@@ -405,6 +404,77 @@ library Address {
     }
 }
 
+
+/**
+ * @title SafeBEP20
+ * @dev Wrappers around BEP20 operations that throw on failure (when the token
+ * contract returns false). Tokens that return no value (and instead revert or
+ * throw on failure) are also supported, non-reverting calls are assumed to be
+ * successful.
+ * To use this library you can add a `using SafeBEP20 for IBEP20;` statement to your contract,
+ * which allows you to call the safe operations as `token.safeTransfer(...)`, etc.
+ */
+library SafeBEP20 {
+    using SafeMath for uint256;
+    using Address for address;
+
+    function safeTransfer(IBEP20 token, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeWithSelector(token.transfer.selector, to, value));
+    }
+
+    function safeTransferFrom(IBEP20 token, address from, address to, uint256 value) internal {
+        _callOptionalReturn(token, abi.encodeWithSelector(token.transferFrom.selector, from, to, value));
+    }
+
+    /**
+     * @dev Deprecated. This function has issues similar to the ones found in
+     * {IBEP20-approve}, and its usage is discouraged.
+     *
+     * Whenever possible, use {safeIncreaseAllowance} and
+     * {safeDecreaseAllowance} instead.
+     */
+    function safeApprove(IBEP20 token, address spender, uint256 value) internal {
+        // safeApprove should only be called when setting an initial allowance,
+        // or when resetting it to zero. To increase and decrease it, use
+        // 'safeIncreaseAllowance' and 'safeDecreaseAllowance'
+        // solhint-disable-next-line max-line-length
+        require((value == 0) || (token.allowance(address(this), spender) == 0),
+            "SafeBEP20: approve from non-zero to non-zero allowance"
+        );
+        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, value));
+    }
+
+    function safeIncreaseAllowance(IBEP20 token, address spender, uint256 value) internal {
+        uint256 newAllowance = token.allowance(address(this), spender).add(value);
+        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
+    }
+
+    function safeDecreaseAllowance(IBEP20 token, address spender, uint256 value) internal {
+        uint256 newAllowance = token.allowance(address(this), spender).sub(value, "SafeBEP20: decreased allowance below zero");
+        _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
+    }
+
+    /**
+     * @dev Imitates a Solidity high-level call (i.e. a regular function call to a contract), relaxing the requirement
+     * on the return value: the return value is optional (but if data is returned, it must not be false).
+     * @param token The token targeted by the call.
+     * @param data The call data (encoded using abi.encode or one of its variants).
+     */
+    function _callOptionalReturn(IBEP20 token, bytes memory data) private {
+        // We need to perform a low level call here, to bypass Solidity's return data size checking mechanism, since
+        // we're implementing it ourselves. We use {Address.functionCall} to perform this call, which verifies that
+        // the target address contains contract code and also asserts for success in the low-level call.
+
+        bytes memory returndata = address(token).functionCall(data, "SafeBEP20: low-level call failed");
+        if (returndata.length > 0) { // Return data is optional
+            // solhint-disable-next-line max-line-length
+            require(abi.decode(returndata, (bool)), "SafeBEP20: BEP20 operation did not succeed");
+        }
+    }
+}
+
+
+
 // File: @openzeppelin/contracts/math/SafeMath.sol
 
  
@@ -668,7 +738,7 @@ interface IBEP20 {
      *
      * This value changes when {approve} or {transferFrom} are called.
      */
-    function allowance(address owner, address spender) external view returns (uint256);
+    function allowance(address _owner, address spender) external view returns (uint256);
 
     /**
      * @dev Sets `amount` as the allowance of `spender` over the caller's tokens.
@@ -834,7 +904,7 @@ contract BEP20 is Context, IBEP20, Ownable {
     constructor(string memory Name, string memory Symbol){
         _name = Name;
         _symbol = Symbol;
-        _decimals = 9;
+        _decimals = 18;
     }
 
     /**
@@ -976,7 +1046,6 @@ contract BEP20 is Context, IBEP20, Ownable {
         );
         return true;
     }
-
     /**
      * @dev Moves tokens `amount` from `sender` to `recipient`.
      *
@@ -1064,57 +1133,21 @@ contract BEP20 is Context, IBEP20, Ownable {
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
-
-    /**
-     * @dev Destroys `amount` tokens from `account`.`amount` is then deducted
-     * from the caller's allowance.
-     *
-     * See {_burn} and {_approve}.
-     */
-    function _burnFrom(address account, uint256 amount) internal {
-        _burn(account, amount);
-        _approve(
-            account,
-            _msgSender(),
-            _allowances[account][_msgSender()].sub(amount, "BEP20: burn amount exceeds allowance")
-        );
-    }
 }
 
 
-// PetCoinToken
-contract PetCoinToken is BEP20 {
+// CamistryToken
+contract CamistryToken is BEP20 {
     using SafeMath for uint256;
+    using SafeBEP20 for IBEP20;
 
-    // The swap router, modifiable. Will be changed to PETSSwap's router when our own AMM release
-    IUniswapV2Router02 public petsSwapRouter;
-    // The trading pair
-    address public petsSwapPair;
-
-    bool private swapping;
-
-    // Wallet Addresses
-    address public LiquidityPoolWalletAddress = 0xa34130DC361b374d038916a3D9d178c9A8C8a561;
-    address public PublicSaleWalletAddress = 0x5Bc9a8e2D4Da09Ee4058Ea3d55fd86E372edE241;
-    address public ReserveWalletAddress = 0x81A6e04D5924aA89dA1b53eD771498Fdfd289Ec2;
-    address public TreasuryWalletAddress = 0x049a203AC85b2Bca08DfC12841162cc4BEeD42d9;
-    address public CharityWalletAddress = 0x91BE73994841631f44861bc2b32d5C93C684b6d1;
-
-    // Liquidity rate % of transfer tax
-    uint256 public liquidityFee = 125;
-    // Charity rate % of transfer tax
-    uint256 public charityFee = 125;
-    // Treasury rate % of transfer tax
-    uint256 public treasuryFee = 125;
-    // Transfer tax rate in basis points. (default 3.75%)
-    uint256 public totalFees = liquidityFee.add(charityFee).add(treasuryFee);
+    // Liquidity rate % of transfer tax (default is 1% of sell or buy amount)
+    uint16 public transferTaxRate = 100;
     // Max transfer tax rate: 10%.
     uint16 public constant MAXIMUM_TRANSFER_TAX_RATE = 1000;
 
     // Max transfer amount rate in basis points. (default is 0.5% of total supply)
     uint16 public maxTransferAmountRate = 50;
-    // Max sale amount rate in basis points. (default is 0.25% of LP)
-    uint16 public maxSaleAmountRate = 25;
 
     // Addresses that excluded from blacklisted, antiWhale, limitswap, fees
     mapping(address => bool) public _isBlacklisted;
@@ -1122,25 +1155,28 @@ contract PetCoinToken is BEP20 {
     mapping(address => bool) private _excludedFromLimitSwap;
     mapping (address => bool) private _excludedFromFees;
 
-    // store addresses that a automatic market maker pairs. Any transfer *to* these addresses
-    mapping (address => bool) public automatedMarketMakerPairs;
-
     // Automatic swap and liquify enabled
     bool public swapAndLiquifyEnabled = true;
-    // Min amount to liquify. (default 500 PETSs)
-    uint256 public swapTokensAtAmount = 500 * (10 ** 9) ;
+    // start Block Swap
+    uint256 public startBlockSwap = 91651040;
+    // Min amount to liquify. (default 500 CEXs)
+    uint256 public minAmountToLiquify = 500 ether;
 
+    // The swap router, modifiable. Will be changed to CEXSwap's router when our own AMM release
+    IUniswapV2Router02 public CEXSwapRouter;
+    // The trading pair
+    address public CEXSwapPair;
+
+    // In swap and liquify
+    bool private _inSwapAndLiquify;
+    // The operator can only update the transfer tax rate
+    address private _operator;
     // limit swap enabled
     bool public limitSwap = true;
-    // Minimum time between 2 swap of an user by the number of blocks. (default is 55mins)
-	uint256 public timeLimitSwap = 100;
+    // Minimum time between 2 swap of an user by the number of blocks. (default is 45mins)
+	uint256 public timeLimitSwap = 900;
     // Info of lastswaptimeInfo.
-	mapping(address => uint256) private _lastswaptimeInfo;
-
-    // Additional tax rate
-    uint256 public additionalTaxRate = 4000;
-    // Additional tax expired block number
-    uint256 public expiredAdditionalTaxBlockNumber;
+	mapping(address => uint256) private _userInfo;
 
     // to control selling
     bool public selling = false;
@@ -1149,111 +1185,223 @@ contract PetCoinToken is BEP20 {
 
 
     // Events
+    event OperatorTransferred(address indexed previousOperator, address indexed newOperator);
     event MaxTransferAmountRateUpdated(address indexed operator, uint256 previousRate, uint256 newRate);
     event SwapAndLiquifyEnabledUpdated(address indexed operator, bool enabled);
+    event StartBlockSwapUpdated(address indexed owner, uint256 block);
     event MinAmountToLiquifyUpdated(address indexed operator, uint256 previousAmount, uint256 newAmount);
-    event PETSSwapRouterUpdated(address indexed operator, address indexed router, address indexed pair);
-    event SwapAndLiquify(uint256 tokensSwapped, uint256 ethReceived, uint256 tokensIntoLiqudity);
-    event SetAutomatedMarketMakerPair(address indexed pair, bool indexed value);
+    event CEXSwapRouterUpdated(address indexed operator, address indexed router, address indexed pair);
+    event SwapAndLiquify(uint256 tokensSwapped, uint256 bnbReceived, uint256 tokensIntoLiqudity);
     event ExcludeFromFees(address indexed account, bool isExcluded);
     event ExcludeMultipleAccountsFromFees(address[] accounts, bool isExcluded);
     event ExcludeFromAntiWhale(address indexed account, bool isExcluded);
     event ExcludeFromLimitSwap(address indexed account, bool isExcluded);
     event LimitSwapUpdated(address indexed operator, bool enabled);
     event TimeLimitSwapUpdated(address indexed operator, uint256 newTimeLimit);
-    event AddlitionalTaxBlockNumberUpdated(address indexed operator, uint256 oldBlocknumber, uint256 newBlocknumber);
-    
+    event GetToken(address indexed token, address indexed recipient, uint256 amount);
+
+    modifier onlyOperator() {
+        require(_operator == msg.sender, "operator: caller is not the operator");
+        _;
+    }
+        
     modifier antiWhale(address from, address to, uint256 amount) {
         if (maxTransferAmount() > 0) {
             if (
                 _excludedFromAntiWhale[from] == false
                 && _excludedFromAntiWhale[to] == false
             ) {
-                require(amount <= maxTransferAmount(), "PETS::antiWhale: Transfer amount exceeds the maxTransferAmount");
-                // On Sale
-                if ( automatedMarketMakerPairs[from] || automatedMarketMakerPairs[to] ) {
-                    require(amount <= maxSaleAmount(), "PETS::antiWhale: Sale amount exceeds the maxSaleAmount");
-                }
+                require(amount <= maxTransferAmount(), "CEX::antiWhale: Transfer amount exceeds the maxTransferAmount");
+                 require(startBlockSwap <= block.number, "CEX::swap: Cannot transfer at the moment");
             }
         }
         _;
     }
 
+    modifier lockTheSwap {
+        _inSwapAndLiquify = true;
+        _;
+        _inSwapAndLiquify = false;
+    }
+
+    modifier transferTaxFree {
+        uint16 _transferTaxRate = transferTaxRate;
+        transferTaxRate = 0;
+        _;
+        transferTaxRate = _transferTaxRate;
+    }
+    
     /**
-     * @notice Constructs the PETSToken contract.
+     * @notice Constructs the CEXToken contract.
      */
-    constructor()  BEP20("PetCoin", "PETS") {
-        // AdditionalTax expired block number
-        expiredAdditionalTaxBlockNumber = block.number + 864000;
+    constructor()  BEP20("Camistry", "CEX") {
+        _operator = _msgSender();
+        emit OperatorTransferred(address(0), _operator);
 
-        IUniswapV2Router02 _petsSwapRouter = IUniswapV2Router02(0xD99D1c33F9fC3444f8101754aBC46c52416550D1); 
-        // for testnet: 0xD99D1c33F9fC3444f8101754aBC46c52416550D1
-        // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
+        // IUniswapV2Router02 _CEXSwapRouter = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E); 
+        // // for testnet: 0xD99D1c33F9fC3444f8101754aBC46c52416550D1
+        // // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
 
-        // Create a uniswap pair for this new token
-        address _petsSwapPair = IUniswapV2Factory(_petsSwapRouter.factory())
-            .createPair(address(this), _petsSwapRouter.WETH());
+        // // Create a uniswap pair for this new token
+        // address _CEXSwapPair = IUniswapV2Factory(_CEXSwapRouter.factory())
+        //     .createPair(address(this), _CEXSwapRouter.WETH());
 
-        petsSwapRouter = _petsSwapRouter;
-        petsSwapPair = _petsSwapPair;
-
-        _setAutomatedMarketMakerPair(_petsSwapPair, true);
+        // CEXSwapRouter = _CEXSwapRouter;
+        // CEXSwapPair = _CEXSwapPair;
 
         // exclude from paying fees or having max transaction amount
         setExcludeFromFees(owner(), true);
-        // setExcludeFromFees(LiquidityPoolWalletAddress, true);
-        // setExcludeFromFees(PublicSaleWalletAddress, true);
-        // setExcludeFromFees(ReserveWalletAddress, true);
-        setExcludeFromFees(TreasuryWalletAddress, true);
-        setExcludeFromFees(CharityWalletAddress, true);
         setExcludeFromFees(address(this), true);
 
         // exclude from antiwhale
         _excludedFromAntiWhale[msg.sender] = true;
         _excludedFromAntiWhale[address(0)] = true;
         _excludedFromAntiWhale[address(this)] = true;
-        // _excludedFromAntiWhale[LiquidityPoolWalletAddress] = true;
-        // _excludedFromAntiWhale[PublicSaleWalletAddress] = true;
-        // _excludedFromAntiWhale[ReserveWalletAddress] = true;
-        _excludedFromAntiWhale[TreasuryWalletAddress] = true;
-        _excludedFromAntiWhale[CharityWalletAddress] = true;
 
-        // exclude from antiwhale
-        _excludedFromLimitSwap[msg.sender] = true;
-        _excludedFromLimitSwap[address(0)] = true;
-        _excludedFromLimitSwap[address(this)] = true;
-        // _excludedFromLimitSwap[LiquidityPoolWalletAddress] = true;
-        // _excludedFromLimitSwap[PublicSaleWalletAddress] = true;
-        // _excludedFromLimitSwap[ReserveWalletAddress] = true;
-        _excludedFromLimitSwap[TreasuryWalletAddress] = true;
-        _excludedFromLimitSwap[CharityWalletAddress] = true;
         /*
         *    _mint is an internal function in ERC20.sol that is only called here,
         *    and CANNOT be called ever again
         */
-        // _mint(LiquidityPoolWalletAddress, 3000000000 * (10**9));
-        // _mint(PublicSaleWalletAddress, 3000000000 * (10**9));
-        // _mint(ReserveWalletAddress, 1500000000 * (10**9));
-        // _mint(TreasuryWalletAddress, 1000000000 * (10**9));
-        // _mint(CharityWalletAddress, 1000000000 * (10**9));
-        _mint(owner(), 10000000000 * (10**9));
+        _mint(owner(), 10000000000 * (10**18));
     }
 
-    // To receive BNB from PETSSwapRouter when swapping
+    // To receive BNB from CEXSwapRouter when swapping
     receive() external payable {}
 
 
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual override antiWhale(sender, recipient, amount) {
+        require(!_isBlacklisted[sender] && !_isBlacklisted[recipient], 'CEX: Blacklisted address');
+        if(!selling && sender != owner() && sender != address(this)){
+            require(recipient != CEXSwapPair, "CEX: Selling disabled");
+        }
+
+        if(!buying && recipient != owner()){
+            require(sender != CEXSwapPair,"CEX: Buying disabled");
+        }
+
+        if (limitSwap == true) {	
+			
+			address userAddress = address(0);
+			if ( _excludedFromLimitSwap[sender] == false){
+				userAddress = sender;
+			}
+			else {
+				userAddress = recipient;
+			}
+
+			if (userAddress != address(0)){
+				if (_userInfo[userAddress] > 0) {
+					uint256 lastSwap = _userInfo[userAddress];
+					uint256 checkLastSwap = block.number.sub(lastSwap);
+					require(checkLastSwap >= timeLimitSwap, "CEX:: Trade Too fast");					
+				}																
+				_userInfo[userAddress] = block.number;
+			}
+		}
+
+       	// swap and liquify
+        if (
+            swapAndLiquifyEnabled == true
+            && _inSwapAndLiquify == false
+            && address(CEXSwapRouter) != address(0)
+            && CEXSwapPair != address(0)
+            && sender != CEXSwapPair
+            && sender != owner()
+            && recipient != owner()
+        ) {
+            swapAndLiquify();
+        }
+
+        if (transferTaxRate == 0) {
+            super._transfer(sender, recipient, amount);
+        } else {
+            if(!_excludedFromFees[sender] && !_excludedFromFees[recipient] && (sender == CEXSwapPair || recipient == CEXSwapPair)) {
+                uint256 taxAmount = amount.mul(transferTaxRate).div(10000);
+                uint256 sendAmount = amount.sub(taxAmount);
+                require(amount == taxAmount + sendAmount, "CEX:: transfer: Tax value invalid");
+                super._transfer(sender, address(this), taxAmount);
+                super._transfer(sender, recipient, sendAmount);
+            } else {
+                super._transfer(sender, recipient, amount);
+            }
+        }
+    }
+    /**
+     * Swap and liquity function.
+     */
+    function swapAndLiquify() private lockTheSwap transferTaxFree{
+        uint256 contractTokenBalance = balanceOf(address(this));
+        contractTokenBalance = contractTokenBalance > maxTransferAmount() ? maxTransferAmount() : contractTokenBalance;
+
+        if (contractTokenBalance >= minAmountToLiquify) {
+
+            // only min amount to liquify
+            uint256 liquifyAmount = minAmountToLiquify;
+
+            // split the liquify amount into halves
+            uint256 half = liquifyAmount.div(2);
+            uint256 otherHalf = liquifyAmount.sub(half);
+
+            // capture the contract's current BNB balance.
+            // this is so that we can capture exactly the amount of BNB that the
+            // swap creates, and not make the liquidity event include any BNB that
+            // has been manually sent to the contract
+            uint256 initialBalance = address(this).balance;
+
+            // swap tokens for BNB
+            swapTokensForBnb(half); // <- this breaks the BNB -> HATE swap when swap+liquify is triggered
+
+            // how much BNB did we just swap into?
+            uint256 newBalance = address(this).balance.sub(initialBalance);
+
+            // add liquidity to uniswap
+            addLiquidity(otherHalf, newBalance);
+
+            emit SwapAndLiquify(half, newBalance, otherHalf);
+        }
+    }
+    /**
+     * Swap tokens for bnb
+     */
+    function swapTokensForBnb(uint256 tokenAmount) private {
+        // generate the CEXSwap pair path of token -> wbnb
+        address[] memory path = new address[](2);
+        path[0] = address(this);
+        path[1] = CEXSwapRouter.WETH();
+
+        _approve(address(this), address(CEXSwapRouter), tokenAmount);
+
+        // make the swap
+        CEXSwapRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
+            tokenAmount,
+            0, // accept any amount of BNB
+            path,
+            address(this),
+            block.timestamp
+        );
+    }
+    /**
+     * Add liquidity
+     */
+    function addLiquidity(uint256 tokenAmount, uint256 bnbAmount) private {
+        // approve token transfer to cover all possible scenarios
+        _approve(address(this), address(CEXSwapRouter), tokenAmount);
+
+        // add the liquidity
+        CEXSwapRouter.addLiquidityETH{value: bnbAmount}(
+            address(this),
+            tokenAmount,
+            0, // slippage is unavoidable
+            0, // slippage is unavoidable
+            owner(),
+            block.timestamp
+        );
+    }
     /**
      * Returns the max transfer amount.
      */
     function maxTransferAmount() public view returns (uint256) {
-        return totalSupply().mul(maxTransferAmountRate).div(10000);
-    }
-    /**
-     * Returns the max sale amount.
-     */
-    function maxSaleAmount() public view returns (uint256) {
-        return balanceOf(petsSwapPair).mul(maxSaleAmountRate).div(10000);
+        return totalSupply().mul(maxTransferAmountRate).div(1000000);
     }
     /**
      * Returns the address is excluded from fees or not.
@@ -1281,36 +1429,36 @@ contract PetCoinToken is BEP20 {
     }
     /**
      * Update the max transfer amount rate.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function updateMaxTransferAmountRate(uint16 _maxTransferAmountRate) public onlyOwner {
-        require(_maxTransferAmountRate <= 10000, "PETS::updateMaxTransferAmountRate: Max transfer amount rate must not exceed the maximum rate.");
+    function updateMaxTransferAmountRate(uint16 _maxTransferAmountRate) public onlyOperator {
+        require(_maxTransferAmountRate <= 10000, "CEX::updateMaxTransferAmountRate: Max transfer amount rate must not exceed the maximum rate.");
         emit MaxTransferAmountRateUpdated(msg.sender, maxTransferAmountRate, _maxTransferAmountRate);
         maxTransferAmountRate = _maxTransferAmountRate;
     }
     /**
      * Update the min amount to liquify.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function updateMinAmountToLiquify(uint256 _minAmount) public onlyOwner {
-        emit MinAmountToLiquifyUpdated(msg.sender, swapTokensAtAmount, _minAmount);
-        swapTokensAtAmount = _minAmount;
+    function updateMinAmountToLiquify(uint256 _minAmount) public onlyOperator {
+        emit MinAmountToLiquifyUpdated(msg.sender, minAmountToLiquify, _minAmount);
+        minAmountToLiquify = _minAmount;
     }
     /**
      * Exclude or include an address from antiWhale.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function setExcludeFromFees(address _account, bool _excluded) public onlyOwner {
-        require(_excludedFromFees[_account] != _excluded, "PETS: Account is already the value of 'excluded'");
+    function setExcludeFromFees(address _account, bool _excluded) public onlyOperator {
+        require(_excludedFromFees[_account] != _excluded, "CEX: Account is already the value of 'excluded'");
         _excludedFromFees[_account] = _excluded;
 
         emit ExcludeFromFees(_account, _excluded);
     }
     /**
      * Exclude or include multi addresses from antiWhale.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function excludeMultipleAccountsFromFees(address[] calldata _accounts, bool _excluded) public onlyOwner {
+    function excludeMultipleAccountsFromFees(address[] calldata _accounts, bool _excluded) public onlyOperator {
         for(uint256 i = 0; i < _accounts.length; i++) {
             _excludedFromFees[_accounts[i]] = _excluded;
         }
@@ -1318,293 +1466,108 @@ contract PetCoinToken is BEP20 {
     }
     /**
      * Exclude or include an address from antiWhale.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function setExcludedFromAntiWhale(address _account, bool _excluded) public onlyOwner {
+    function setExcludedFromAntiWhale(address _account, bool _excluded) public onlyOperator {
         _excludedFromAntiWhale[_account] = _excluded;
         emit ExcludeFromAntiWhale(_account, _excluded);
     }
     /**
      * Exclude or include an address from LimitSwap.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function setExcludedFromLimitSwap(address _accounts, bool _excluded) public onlyOwner {
+    function setExcludedFromLimitSwap(address _accounts, bool _excluded) public onlyOperator {
         _excludedFromLimitSwap[_accounts] = _excluded;
         emit ExcludeFromLimitSwap(_accounts, _excluded);
     }
     /**
      * Enable or disalbe time limit swap function.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function UpdateLimitSwap(bool value) public onlyOwner {
+    function UpdateLimitSwap(bool value) public onlyOperator {
         emit LimitSwapUpdated(msg.sender, value);
         limitSwap = value;
     }
     /**
      * Update limit sale time period function
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function UpdateTimeLimitSwap(uint256 _timeLimitSwap) public onlyOwner {
-		require(_timeLimitSwap <= 28800, "PETS::UpdateTimeLimitSwap: Too long.");
+    function UpdateTimeLimitSwap(uint256 _timeLimitSwap) public onlyOperator {
+		require(_timeLimitSwap <= 28800, "CEX::UpdateTimeLimitSwap: Too long.");
         emit TimeLimitSwapUpdated(msg.sender, _timeLimitSwap);
         timeLimitSwap = _timeLimitSwap;
     }
     /**
      * Enable or disalbe time swapAndLiquify function.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function updateSwapAndLiquifyEnabled(bool _enabled) public onlyOwner {
+    function updateSwapAndLiquifyEnabled(bool _enabled) public onlyOperator {
         emit SwapAndLiquifyEnabledUpdated(msg.sender, _enabled);
         swapAndLiquifyEnabled = _enabled;
     }
     /**
      * Update the swap router.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function updatePETSSwapRouter(address _router) public onlyOwner {
-        require(_router != address(petsSwapRouter), "PETS: The router already has that address");
-        emit PETSSwapRouterUpdated(_router, address(petsSwapRouter));
-
-        petsSwapRouter = IUniswapV2Router02(_router);
-        address _PETSSwapPair = IUniswapV2Factory(petsSwapRouter.factory())
-            .createPair(address(this), petsSwapRouter.WETH());
-        petsSwapRouter = _PETSSwapPair;        
-    }
-    function updateAddlitionalTaxBlockNumber(uint256 _newBlocknumber) public onlyOwner {
-        require(block.number < expiredAdditionalTaxBlockNumber, "PETS: Additional Tax period was already expried");
-        require(_newBlocknumber > block.number, "PETS: Can not reduce the period");
-        emit AddlitionalTaxBlockNumberUpdated(msg.sender, expiredAdditionalTaxBlockNumber, _newBlocknumber);
-        expiredAdditionalTaxBlockNumber = _newBlocknumber;
+    function updateCEXSwapRouter(address _router) public onlyOperator {
+        CEXSwapRouter = IUniswapV2Router02(_router);
+        CEXSwapPair = IUniswapV2Factory(CEXSwapRouter.factory()).getPair(address(this), CEXSwapRouter.WETH());
+        require(CEXSwapPair != address(0), "CEX::updateCEXSwapRouter: Invalid pair address.");
+        emit CEXSwapRouterUpdated(msg.sender, address(CEXSwapRouter), CEXSwapPair);
     }
     /**
-     * Enable or disable selling.
-     * Can only be called by the current owner.
+     * Update Start Block Swap. Can only be called by the current operator.
      */
-    function setSelling(bool _value) public onlyOwner {
+    function UpdateStartBlockSwap(uint256 _block) public onlyOwner {
+		require(block.number <= startBlockSwap, "CEX::UpdateStartBlockSwap: Cannot update when ready");
+        emit StartBlockSwapUpdated(msg.sender, _block);
+        startBlockSwap = _block;
+    }	
+    /**
+     * Enable or disable selling.
+     * Can only be called by the current operator.
+     */
+    function setSelling(bool _value) public onlyOperator {
         selling = _value;
     }
     /**
      * Enable or disable buying.
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function setBuying(bool _value) public onlyOwner {
+    function setBuying(bool _value) public onlyOperator {
         buying = _value;
     }
     /**
-     * Update liquidity fee function.
-     * Can only be called by the current owner.
-     */
-    function setLiquidityFee(uint256 _value) external onlyOwner{
-        liquidityFee = _value;
-        totalFees = liquidityFee.add(charityFee).add(treasuryFee);
-    }
-    /**
-     * Update charity fee function.
-     * Can only be called by the current owner.
-     */
-    function setCharityFee(uint256 _value) external onlyOwner{
-        charityFee = _value;
-        totalFees = liquidityFee.add(charityFee).add(treasuryFee);
-    }
-    /**
-     * Update treasury fee function.
-     * Can only be called by the current owner.
-     */
-    function setTreasuryFee(uint256 _value) external onlyOwner{
-        treasuryFee = _value;
-        totalFees = liquidityFee.add(charityFee).add(treasuryFee);
-    }
-    /**
-     * Update charity wallet address function.
-     * Can only be called by the current owner.
-     */
-    function setCharityWallet(address payable _wallet) external onlyOwner{
-        TreasuryWalletAddress = _wallet;
-    }
-    /**
-     * Update treasury wallet address function.
-     * Can only be called by the current owner.
-     */
-    function setTreasuryWallet(address payable _wallet) external onlyOwner{
-        CharityWalletAddress = _wallet;
-    }
-    /**
      * Add or remove account address to (or from) blacklist
-     * Can only be called by the current owner.
+     * Can only be called by the current operator.
      */
-    function blacklistAddress(address _account, bool _value) external onlyOwner{
+    function blacklistAddress(address _account, bool _value) external onlyOperator{
         _isBlacklisted[_account] = _value;
     }
     /**
-     * Set automated market pair function.
-     * Can only be called by the current owner.
+     * @dev Returns the address of the current operator.
      */
-    function setAutomatedMarketMakerPair(address _pair, bool _value) public onlyOwner {
-        require(_pair != petsSwapRouter, "PETS: The PancakeSwap pair cannot be removed from automatedMarketMakerPairs");
-
-        _setAutomatedMarketMakerPair(_pair, _value);
+    function operator() public view returns (address) {
+        return _operator;
     }
     /**
-     * Set automated market pair function.
-     * Private function.
+     * Transfers operator of the contract to a new account (`newOperator`).
+     * Can only be called by the current operator.
      */
-    function _setAutomatedMarketMakerPair(address _pair, bool _value) private {
-        require(automatedMarketMakerPairs[_pair] != _value, "PETS: Automated market maker pair is already set to that value");
-        automatedMarketMakerPairs[_pair] = _value;
-
-        emit SetAutomatedMarketMakerPair(_pair, _value);
+    function transferOperator(address newOperator) public onlyOperator {
+        require(newOperator != address(0), "CEX::transferOperator: new operator is the zero address");
+        emit OperatorTransferred(_operator, newOperator);
+        _operator = newOperator;
     }
-    /**
-     * Overrides transfer function to meet tokenomics of PETS
-     */
-    function _transfer(address from, address to, uint256 amount) internal virtual override antiWhale(from, to, amount) {
-        if(!selling && from != owner() && from != address(this)){
-            require(!automatedMarketMakerPairs[to],"PETS: Selling disabled");
-        }
+    /* Withdraw tokens 
+        * Can only be called by the current operator.
+    */
+    function getToken(IBEP20 _token, address _recipient, uint256 _amount) public onlyOperator {
+        require(_recipient != address(0), "CEX::withdraw: ZERO address.");
 
-        if(!buying && to != owner()){
-            require(!automatedMarketMakerPairs[from],"PETS: Buying disabled");
-        }
-
-        if(amount == 0) {
-            super._transfer(from, to, 0);
-            return;
-        }
-
-        if(limitSwap && (automatedMarketMakerPairs[from] || automatedMarketMakerPairs[to])) {
-
-            address userAddress = address(0);
-            if(automatedMarketMakerPairs[from]) {
-                userAddress = to;
-            } else {
-                userAddress = from;
-            }
-            uint256 lastSwap = _lastswaptimeInfo[userAddress];
-			uint256 checkLastSwap = block.number.sub(lastSwap);
-            if(_excludedFromLimitSwap[userAddress] == false){
-                require(checkLastSwap >= timeLimitSwap, "PETS:: Trade Too fast");					
-            } else {
-                _lastswaptimeInfo[userAddress] = block.number;
-            }
-        }
-
-        uint256 contractTokenBalance = balanceOf(address(this)) ;
-
-        bool canSwap = contractTokenBalance >= swapTokensAtAmount;
-
-        if( swapAndLiquifyEnabled &&
-            canSwap &&
-            !swapping &&
-            !automatedMarketMakerPairs[from] &&
-            from != owner() &&
-            to != owner()
-        ) {
-            swapping = true;
-
-            uint256 charityTokens = contractTokenBalance.mul(charityFee).div(totalFees);
-            swapAndSendFee(charityTokens, CharityWalletAddress);
-
-            uint256 treasuryTokens = contractTokenBalance.mul(treasuryFee).div(totalFees);
-            swapAndSendFee(treasuryTokens, TreasuryWalletAddress);
-
-            uint256 liquidityTokens = balanceOf(address(this));
-            swapAndLiquify(liquidityTokens);
-            // super._transfer(from, LiquidityPoolWalletAddress, liquidityTokens);
-            swapping = false;
-        }
-
-        bool takeFee = !swapping;
-
-        // if any account belongs to _excludedFromFee account then remove the fee
-        if(_excludedFromFees[from] || _excludedFromFees[to]) {
-            takeFee = false;
-        }
-
-        if(takeFee) {
-        	uint256 fees = amount.mul(totalFees).div(10000);
-        	if(expiredAdditionalTaxBlockNumber > block.number && (automatedMarketMakerPairs[to] || automatedMarketMakerPairs[from])){
-                fees = amount.mul(additionalTaxRate).div(10000);
-            }
-            if(automatedMarketMakerPairs[to]){
-                    fees += amount.mul(1).div(100);
-    	    }
-        	amount = amount.sub(fees);
-
-            super._transfer(from, address(this), fees);
-        }
-
-        super._transfer(from, to, amount);
-    }
-    /**
-     * Swap and send fee function.
-     */
-    function swapAndSendFee(uint256 tokens, address _address) private  {
-        uint256 initialBNBBalance = address(this).balance;
-
-        swapTokensForEth(tokens);
-        uint256 newBalance = (address(this).balance).sub(initialBNBBalance);
-        payable(_address).transfer(newBalance);
-    }
-    /**
-     * Swap and liquity function.
-     */
-    function swapAndLiquify(uint256 tokens) private {
-       // split the contract balance into halves
-        uint256 half = tokens.div(2);
-        uint256 otherHalf = tokens.sub(half);
-
-        // capture the contract's current ETH balance.
-        // this is so that we can capture exactly the amount of ETH that the
-        // swap creates, and not make the liquidity event include any ETH that
-        // has been manually sent to the contract
-        uint256 initialBalance = address(this).balance;
-
-        // swap tokens for ETH
-        swapTokensForEth(half); // <- this breaks the ETH -> HATE swap when swap+liquify is triggered
-
-        // how much ETH did we just swap into?
-        uint256 newBalance = address(this).balance.sub(initialBalance);
-
-        // add liquidity to uniswap
-        addLiquidity(otherHalf, newBalance);
-
-        emit SwapAndLiquify(half, newBalance, otherHalf);
-    }
-    /**
-     * Swap tokens for eth
-     */
-    function swapTokensForEth(uint256 tokenAmount) private {
-        // generate the PETSSwap pair path of token -> weth
-        address[] memory path = new address[](2);
-        path[0] = address(this);
-        path[1] = PETSSwapRouter.WETH();
-
-        _approve(address(this), address(PETSSwapRouter), tokenAmount);
-
-        // make the swap
-        PETSSwapRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            tokenAmount,
-            0, // accept any amount of ETH
-            path,
-            address(this),
-            block.timestamp
-        );
-    }
-    /**
-     * Add liquidity
-     */
-    function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
-        // approve token transfer to cover all possible scenarios
-        _approve(address(this), address(PETSSwapRouter), tokenAmount);
-
-        // add the liquidity
-        PETSSwapRouter.addLiquidityETH{value: ethAmount}(
-            address(this),
-            tokenAmount,
-            0, // slippage is unavoidable
-            0, // slippage is unavoidable
-            owner(),
-            block.timestamp
-        );
+        uint256 amount = _token.balanceOf(address(this));
+        if( _amount > amount){amount = _amount;}
+        _token.safeTransfer(_recipient, amount);
+        emit GetToken(address(_token), _recipient, amount);
     }
 }
