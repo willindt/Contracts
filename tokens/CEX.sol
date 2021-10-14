@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at BscScan.com on 2021-10-10
+*/
+
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.6;
@@ -1133,14 +1137,32 @@ contract BEP20 is Context, IBEP20, Ownable {
         _allowances[owner][spender] = amount;
         emit Approval(owner, spender, amount);
     }
+
+    /**
+     * @dev Hook that is called before any transfer of tokens. This includes
+     * minting and burning.
+     *
+     * Calling conditions:
+     *
+     * - when `from` and `to` are both non-zero, `amount` of ``from``'s tokens
+     * will be to transferred to `to`.
+     * - when `from` is zero, `amount` tokens will be minted for `to`.
+     * - when `to` is zero, `amount` of ``from``'s tokens will be burned.
+     * - `from` and `to` are never both zero.
+     *
+     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+     */
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual {}
 }
 
 
 // CamistryToken
 contract CamistryToken is BEP20 {
     using SafeMath for uint256;
-    using SafeBEP20 for IBEP20;
-
     // Liquidity rate % of transfer tax (default is 1% of sell or buy amount)
     uint16 public transferTaxRate = 100;
     // Max transfer tax rate: 10%.
@@ -1158,7 +1180,7 @@ contract CamistryToken is BEP20 {
     // Automatic swap and liquify enabled
     bool public swapAndLiquifyEnabled = true;
     // start Block Swap
-    uint256 public startBlockSwap = 91651040;
+    uint256 public startBlockSwap = 91757771;
     // Min amount to liquify. (default 500 CEXs)
     uint256 public minAmountToLiquify = 500 ether;
 
@@ -1192,13 +1214,14 @@ contract CamistryToken is BEP20 {
     event MinAmountToLiquifyUpdated(address indexed operator, uint256 previousAmount, uint256 newAmount);
     event CEXSwapRouterUpdated(address indexed operator, address indexed router, address indexed pair);
     event SwapAndLiquify(uint256 tokensSwapped, uint256 bnbReceived, uint256 tokensIntoLiqudity);
+    event SetAutomatedMarketMakerPair(address indexed pair, bool indexed value);
     event ExcludeFromFees(address indexed account, bool isExcluded);
     event ExcludeMultipleAccountsFromFees(address[] accounts, bool isExcluded);
     event ExcludeFromAntiWhale(address indexed account, bool isExcluded);
     event ExcludeFromLimitSwap(address indexed account, bool isExcluded);
     event LimitSwapUpdated(address indexed operator, bool enabled);
     event TimeLimitSwapUpdated(address indexed operator, uint256 newTimeLimit);
-    event GetToken(address indexed token, address indexed recipient, uint256 amount);
+    event AddlitionalTaxBlockNumberUpdated(address indexed operator, uint256 oldBlocknumber, uint256 newBlocknumber);
 
     modifier onlyOperator() {
         require(_operator == msg.sender, "operator: caller is not the operator");
@@ -1212,7 +1235,10 @@ contract CamistryToken is BEP20 {
                 && _excludedFromAntiWhale[to] == false
             ) {
                 require(amount <= maxTransferAmount(), "CEX::antiWhale: Transfer amount exceeds the maxTransferAmount");
-                 require(startBlockSwap <= block.number, "CEX::swap: Cannot transfer at the moment");
+                // On Sale
+                if ( from == CEXSwapPair || to == CEXSwapPair ) {
+                    require(startBlockSwap <= block.number, "CEX::swap: Cannot Swap at the moment");
+                }
             }
         }
         _;
@@ -1238,16 +1264,16 @@ contract CamistryToken is BEP20 {
         _operator = _msgSender();
         emit OperatorTransferred(address(0), _operator);
 
-        // IUniswapV2Router02 _CEXSwapRouter = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E); 
-        // // for testnet: 0xD99D1c33F9fC3444f8101754aBC46c52416550D1
-        // // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
+        IUniswapV2Router02 _CEXSwapRouter = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E); 
+        // for testnet: 0xD99D1c33F9fC3444f8101754aBC46c52416550D1
+        // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
 
-        // // Create a uniswap pair for this new token
-        // address _CEXSwapPair = IUniswapV2Factory(_CEXSwapRouter.factory())
-        //     .createPair(address(this), _CEXSwapRouter.WETH());
+        Create a uniswap pair for this new token
+        address _CEXSwapPair = IUniswapV2Factory(_CEXSwapRouter.factory())
+            .createPair(address(this), _CEXSwapRouter.WETH());
 
-        // CEXSwapRouter = _CEXSwapRouter;
-        // CEXSwapPair = _CEXSwapPair;
+        CEXSwapRouter = _CEXSwapRouter;
+        CEXSwapPair = _CEXSwapPair;
 
         // exclude from paying fees or having max transaction amount
         setExcludeFromFees(owner(), true);
@@ -1279,14 +1305,17 @@ contract CamistryToken is BEP20 {
             require(sender != CEXSwapPair,"CEX: Buying disabled");
         }
 
-        if (limitSwap == true) {	
+
+        if (limitSwap == true && 
+            ((sender == CEXSwapPair &&  !_excludedFromLimitSwap[recipient]) || 
+            (recipient == CEXSwapPair && !_excludedFromLimitSwap[sender]))) {
 			
 			address userAddress = address(0);
-			if ( _excludedFromLimitSwap[sender] == false){
-				userAddress = sender;
+			if (sender == CEXSwapPair){
+				userAddress = recipient;
 			}
 			else {
-				userAddress = recipient;
+				userAddress = sender;
 			}
 
 			if (userAddress != address(0)){
@@ -1429,7 +1458,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Update the max transfer amount rate.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function updateMaxTransferAmountRate(uint16 _maxTransferAmountRate) public onlyOperator {
         require(_maxTransferAmountRate <= 10000, "CEX::updateMaxTransferAmountRate: Max transfer amount rate must not exceed the maximum rate.");
@@ -1438,7 +1467,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Update the min amount to liquify.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function updateMinAmountToLiquify(uint256 _minAmount) public onlyOperator {
         emit MinAmountToLiquifyUpdated(msg.sender, minAmountToLiquify, _minAmount);
@@ -1446,7 +1475,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Exclude or include an address from antiWhale.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function setExcludeFromFees(address _account, bool _excluded) public onlyOperator {
         require(_excludedFromFees[_account] != _excluded, "CEX: Account is already the value of 'excluded'");
@@ -1456,7 +1485,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Exclude or include multi addresses from antiWhale.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function excludeMultipleAccountsFromFees(address[] calldata _accounts, bool _excluded) public onlyOperator {
         for(uint256 i = 0; i < _accounts.length; i++) {
@@ -1466,7 +1495,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Exclude or include an address from antiWhale.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function setExcludedFromAntiWhale(address _account, bool _excluded) public onlyOperator {
         _excludedFromAntiWhale[_account] = _excluded;
@@ -1474,7 +1503,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Exclude or include an address from LimitSwap.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function setExcludedFromLimitSwap(address _accounts, bool _excluded) public onlyOperator {
         _excludedFromLimitSwap[_accounts] = _excluded;
@@ -1482,7 +1511,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Enable or disalbe time limit swap function.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function UpdateLimitSwap(bool value) public onlyOperator {
         emit LimitSwapUpdated(msg.sender, value);
@@ -1490,7 +1519,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Update limit sale time period function
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function UpdateTimeLimitSwap(uint256 _timeLimitSwap) public onlyOperator {
 		require(_timeLimitSwap <= 28800, "CEX::UpdateTimeLimitSwap: Too long.");
@@ -1499,7 +1528,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Enable or disalbe time swapAndLiquify function.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function updateSwapAndLiquifyEnabled(bool _enabled) public onlyOperator {
         emit SwapAndLiquifyEnabledUpdated(msg.sender, _enabled);
@@ -1507,7 +1536,7 @@ contract CamistryToken is BEP20 {
     }
     /**
      * Update the swap router.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function updateCEXSwapRouter(address _router) public onlyOperator {
         CEXSwapRouter = IUniswapV2Router02(_router);
@@ -1516,30 +1545,30 @@ contract CamistryToken is BEP20 {
         emit CEXSwapRouterUpdated(msg.sender, address(CEXSwapRouter), CEXSwapPair);
     }
     /**
-     * Update Start Block Swap. Can only be called by the current operator.
+     * Update Start Block Swap. Can only be called by the current Owner.
      */
     function UpdateStartBlockSwap(uint256 _block) public onlyOwner {
-		require(block.number <= startBlockSwap, "CEX::UpdateStartBlockSwap: Cannot update when ready");
+		require(block.number <= startBlockSwap, "CEX::UpdateStartBlockSwap: Already started");
         emit StartBlockSwapUpdated(msg.sender, _block);
         startBlockSwap = _block;
     }	
     /**
      * Enable or disable selling.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function setSelling(bool _value) public onlyOperator {
         selling = _value;
     }
     /**
      * Enable or disable buying.
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function setBuying(bool _value) public onlyOperator {
         buying = _value;
     }
     /**
      * Add or remove account address to (or from) blacklist
-     * Can only be called by the current operator.
+     * Can only be called by the current owner.
      */
     function blacklistAddress(address _account, bool _value) external onlyOperator{
         _isBlacklisted[_account] = _value;
@@ -1551,23 +1580,12 @@ contract CamistryToken is BEP20 {
         return _operator;
     }
     /**
-     * Transfers operator of the contract to a new account (`newOperator`).
+     * @dev Transfers operator of the contract to a new account (`newOperator`).
      * Can only be called by the current operator.
      */
     function transferOperator(address newOperator) public onlyOperator {
         require(newOperator != address(0), "CEX::transferOperator: new operator is the zero address");
         emit OperatorTransferred(_operator, newOperator);
         _operator = newOperator;
-    }
-    /* Withdraw tokens 
-        * Can only be called by the current operator.
-    */
-    function getToken(IBEP20 _token, address _recipient, uint256 _amount) public onlyOperator {
-        require(_recipient != address(0), "CEX::withdraw: ZERO address.");
-
-        uint256 amount = _token.balanceOf(address(this));
-        if( _amount > amount){amount = _amount;}
-        _token.safeTransfer(_recipient, amount);
-        emit GetToken(address(_token), _recipient, amount);
     }
 }

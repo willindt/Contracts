@@ -683,6 +683,8 @@ contract ExchangeWithNewShiva is Ownable {
     using SafeMath for uint256;
     
     uint256 public addedRate = 200000;
+    address public deadWallet = 0x000000000000000000000000000000000000dEaD;
+
     IBEP20 public oldtoken;
     IBEP20 public newtoken;
     mapping(address => bool) public allowedusers;
@@ -723,7 +725,7 @@ contract ExchangeWithNewShiva is Ownable {
     function exchange() public {
         require(allowedusers[msg.sender], "ExchangeWithNewShiva::exchange: You are not allowed to exchange.");
         uint256 oldtokenAmount = oldtoken.balanceOf(msg.sender);
-        oldtoken.safeTransferFrom(msg.sender, address(this), oldtokenAmount);
+        oldtoken.safeTransferFrom(msg.sender, deadWallet, oldtokenAmount);
         uint256 newtokenAmount = oldtokenAmount.mul(addedRate+1000000).div(1000000);
         require(newtoken.balanceOf(address(this)) >= newtokenAmount, "ExchangeWithNewShiva::exchange: Insufficient Amount please contact community.");
         newtoken.safeTransfer(msg.sender, newtokenAmount);
