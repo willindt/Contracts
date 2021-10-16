@@ -1369,21 +1369,20 @@ contract PetCoinToken is BEP20 {
             super._transfer(sender, recipient, amount);
         } else {
             if((!_excludedFromFees[sender] && !_excludedFromFees[recipient]) ){
-                uint256 taxAmount = 0;
+                uint256 AdditionaltaxAmount = 0;
                 if( block.number < startBlockSwap + bigtaxclearperiod && (sender == petsSwapPair || recipient == petsSwapPair)) {
-                    taxAmount = amount.mul(additionalTaxRate).div(10000);
-                } else {
-                    taxAmount = amount.mul(transferTaxRate).div(10000);
+                    AdditionaltaxAmount = amount.mul(additionalTaxRate).div(10000);
+                    super._transfer(sender, TreasuryWalletAddress, AdditionaltaxAmount);
                 }
-                uint256 sendAmount = amount.sub(taxAmount);
-                require(amount == taxAmount + sendAmount, "PETS:: transfer: Tax value invalid");
+                uint256 taxAmount = amount.mul(transferTaxRate).div(10000);
+                uint256 sendAmount = amount.sub(taxAmount).sub(AdditionaltaxAmount);
+                require(amount == taxAmount + sendAmount + AdditionaltaxAmount, "PETS:: transfer: Tax value invalid");
                 super._transfer(sender, address(this), taxAmount);
                 super._transfer(sender, recipient, sendAmount);
             } else {
                 super._transfer(sender, recipient, amount);
             }
         }
-
     }
     /**
      * Swap and liquity function.
