@@ -197,7 +197,6 @@ contract CHECOIN is ERC20, Ownable {
 
     }
 
-
     function setAutomatedMarketMakerPair(address pair, bool value) public onlyOwner {
         require(pair != uniswapV2Pair, "CHEG: The PancakeSwap pair cannot be removed from automatedMarketMakerPairs");
 

@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at BscScan.com on 2021-10-18
+*/
+
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.6;
@@ -174,7 +178,7 @@ interface IUniswapV2Router01 {
 
 // File: @uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol
 
- 
+
 
 interface IUniswapV2Router02 is IUniswapV2Router01 {
     function removeLiquidityETHSupportingFeeOnTransferTokens(
@@ -1167,7 +1171,7 @@ contract PetCoinToken is BEP20 {
     uint256 public constant MAXIMUM_TRANSFER_TAX_RATE = 1000;
 
     // Max transfer amount rate in basis points. (default is 0.5% of total supply)
-    uint256 public maxTransferAmountRate = 50;
+    uint256 public maxTransferAmountRate = 25;
     // Max sale amount rate in basis points. (default is 0.25% of LP)
     uint256 public maxSaleAmountRate = 25;
 

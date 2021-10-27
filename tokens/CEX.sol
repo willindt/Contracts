@@ -1268,7 +1268,7 @@ contract CamistryToken is BEP20 {
         // for testnet: 0xD99D1c33F9fC3444f8101754aBC46c52416550D1
         // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
 
-        Create a uniswap pair for this new token
+        // Create a uniswap pair for this new token
         address _CEXSwapPair = IUniswapV2Factory(_CEXSwapRouter.factory())
             .createPair(address(this), _CEXSwapRouter.WETH());
 
