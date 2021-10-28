@@ -1478,8 +1478,8 @@ contract SHIVA is ERC20, Ownable, ReentrancyGuard {
     address public constant BTCB = address(0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c); //BTCB
     //testnet: 0x6ce8dA28E2f864420840cF74474eFf5fD80E65B8
     //mainnet: 0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c
-    uint256 public constant swapTokensAtAmount = 20000000 ether;
-    uint256 public constant BuyBackAtAmount = 1 ether;
+    uint256 public  swapTokensAtAmount = 20000000 ether;
+    uint256 public  BuyBackAtAmount = 0.05 ether;
 
     mapping(address => bool) private _excludedFromAntiWhale;
     mapping(address => bool) private _excludedLimitSwap;
@@ -1504,9 +1504,9 @@ contract SHIVA is ERC20, Ownable, ReentrancyGuard {
 	// limit swap enabled
     bool public limitSwap = true;
     // swap, liquify, dividend disabled
-    bool public swapAndLiquifyDividendEnabled = false;
+    bool public swapAndLiquifyDividendEnabled = true;
     // swap start block
-    uint256 swapStartblock = 99999999;
+    uint256 public swapStartblock = 99999999;
 	// Minimum time between 2 swap of an user (by the number of blocks)
 	uint256 public timeLimitSwap = 100;
     // Info of UserInfo.
@@ -1534,6 +1534,7 @@ contract SHIVA is ERC20, Ownable, ReentrancyGuard {
     event MarketingFeeUpdated(address indexed operator, uint256 oldMarketingfee, uint256 newBTCBRewardsfee);
     event ShivaTokensWithdrawn(address indexed operator, address indexed recipient, uint256 amount);
     event BNBWithdrawn(address indexed operator, address indexed recipient, uint256 amount);
+    event SwapTokensAtAmountUpdated(address indexed operator, uint256 newSwapAtAmount, uint256 newBuybackAtAmount);
 
     event ProcessedDividendTracker(
     	uint256 iterations,
@@ -1703,6 +1704,12 @@ contract SHIVA is ERC20, Ownable, ReentrancyGuard {
         require(totalFees <= 20, "SHIVA::setBTCBRewardsFee: Too high Fees");
         emit MarketingFeeUpdated(msg.sender, marketingFee, value);
         marketingFee = value;
+    }
+
+    function updateSwapTokensAtAmount(uint256 newSwapAtAmount, uint256 newBuyAtAmount) external onlyOwner {
+        swapTokensAtAmount = newSwapAtAmount;
+        BuyBackAtAmount = newBuyAtAmount;
+        emit SwapTokensAtAmountUpdated(msg.sender, swapTokensAtAmount, BuyBackAtAmount);
     }
 
     function setAutomatedMarketMakerPair(address pair, bool value) public onlyOwner {
