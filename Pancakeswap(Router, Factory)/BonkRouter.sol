@@ -473,8 +473,7 @@ contract BonkRouter is IBonkRouter02 {
         address to,
         uint deadline
     ) external virtual override payable ensure(deadline) returns (uint amountToken, uint amountETH, uint liquidity) {
-        uint256 ramountETH = amountETH - liquidityfee;
-        (amountToken, ramountETH) = _addLiquidity(
+        (amountToken, amountETH) = _addLiquidity(
             token,
             WETH,
             amountTokenDesired,
@@ -482,14 +481,13 @@ contract BonkRouter is IBonkRouter02 {
             amountTokenMin,
             amountETHMin
         );
-        address pair = BonkLibrary.pairFor(factory, token, WETH);
+        address pair = PancakeLibrary.pairFor(factory, token, WETH);
         TransferHelper.safeTransferFrom(token, msg.sender, pair, amountToken);
-        IWETH(WETH).deposit{value: ramountETH}();
-        assert(IWETH(WETH).transfer(pair, ramountETH));
-        liquidity = IBonkPair(pair).mint(to);
-        assert(IWETH(WETH).transfer(feeTo, liquidityfee));
+        IWETH(WETH).deposit{value: amountETH}();
+        assert(IWETH(WETH).transfer(pair, amountETH));
+        liquidity = IPancakePair(pair).mint(to);
         // refund dust eth, if any
-        if (msg.value > ramountETH) TransferHelper.safeTransferETH(msg.sender, msg.value - ramountETH);
+        if (msg.value > amountETH) TransferHelper.safeTransferETH(msg.sender, msg.value - amountETH);
     }
 
     // **** REMOVE LIQUIDITY ****

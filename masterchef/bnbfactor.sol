@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT
 
-/* IUniswapV2Router.sol */
 pragma solidity ^0.8.4;
+
+interface IBEP20 {
+    function totalSupply() external view returns (uint256);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
 
 interface IUniswapV2Router01 {
 
@@ -137,110 +148,20 @@ interface IUniswapV2Router02 is IUniswapV2Router01 {
     ) external;
 }
 
-
-/* IUniswapV2Factory */
-
-interface IUniswapV2Factory {
-
-    event PairCreated(address indexed token0, address indexed token1, address pair, uint);
-
-    function feeTo() external view returns (address);
-    function feeToSetter() external view returns (address);
-    function getPair(address tokenA, address tokenB) external view returns (address pair);
-    function allPairs(uint) external view returns (address pair);
-    function allPairsLength() external view returns (uint);
-    function createPair(address tokenA, address tokenB) external returns (address pair);
-    function setFeeTo(address) external;
-    function setFeeToSetter(address) external;
-}
-
-
-/* IUniswapv2Pair.sol */
-
-interface IUniswapV2Pair {
-
-    event Approval(address indexed owner, address indexed spender, uint value);
-    event Transfer(address indexed from, address indexed to, uint value);
-
-    function name() external pure returns (string memory);
-    function symbol() external pure returns (string memory);
-    function decimals() external pure returns (uint8);
-    function totalSupply() external view returns (uint);
-    function balanceOf(address owner) external view returns (uint);
-    function allowance(address owner, address spender) external view returns (uint);
-    function approve(address spender, uint value) external returns (bool);
-    function transfer(address to, uint value) external returns (bool);
-    function transferFrom(address from, address to, uint value) external returns (bool);
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
-    function PERMIT_TYPEHASH() external pure returns (bytes32);
-    function nonces(address owner) external view returns (uint);
-    function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
-
-    event Mint(address indexed sender, uint amount0, uint amount1);
-    event Burn(address indexed sender, uint amount0, uint amount1, address indexed to);
-    event Swap(
-        address indexed sender,
-        uint amount0In,
-        uint amount1In,
-        uint amount0Out,
-        uint amount1Out,
-        address indexed to
-    );
-    event Sync(uint112 reserve0, uint112 reserve1);
-
-    function MINIMUM_LIQUIDITY() external pure returns (uint);
-    function factory() external view returns (address);
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function price0CumulativeLast() external view returns (uint);
-    function price1CumulativeLast() external view returns (uint);
-    function kLast() external view returns (uint);
-    function mint(address to) external returns (uint liquidity);
-    function burn(address to) external returns (uint amount0, uint amount1);
-    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
-    function skim(address to) external;
-    function sync() external;
-    function initialize(address, address) external;
-}
-
-/* IBEP20.sol */
-
-interface IBEP20 {
-
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
-// pragma solidity 0.5.10;
-
-contract BNBFactor {
+contract Morebnb {
 	using SafeMath for uint256;
-
-    IUniswapV2Router02 public uniswapV2Router;
-    address public uniswapV2Pair;
 	
 	uint256 constant public INVEST_MIN_AMOUNT = 5e16; // 0.05 bnb
 	uint256[] public REFERRAL_PERCENTS = [70, 30, 15, 10, 5];
-	uint256 constant public PROJECT_FEE = 80;
-	uint256 constant public BUYBACK_FEE = 20;
+	uint256 constant public PROJECT_FEE = 120;
+	uint256 constant public LIQUIDITY_FEE = 30;
 	uint256 constant public PERCENT_STEP = 5;
 	uint256 constant public PERCENTS_DIVIDER = 1000;
 	uint256 constant public TIME_STEP = 1 days;
-	address public DEADWALLET = 0x000000000000000000000000000000000000dEaD;
 
-	address public shiva = address(0xb5A5F8fce365a3C50B54407438dC8a9A2C86b346);
+    IUniswapV2Router02 public uniswapV2Router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+	IBEP20 public SHIVA;
+
 	uint256 public totalInvested;
 	uint256 public totalRefBonus;
 
@@ -270,7 +191,8 @@ contract BNBFactor {
 	mapping (address => User) internal users;
 
 	bool public started;
-	address payable public commissionWallet;
+	address payable public feeWallet;
+    address payable private devWallet;
 
 	event Newbie(address user);
 	event NewDeposit(address indexed user, uint8 plan, uint256 amount);
@@ -278,11 +200,16 @@ contract BNBFactor {
 	event RefBonus(address indexed referrer, address indexed referral, uint256 indexed level, uint256 amount);
 	event FeePayed(address indexed user, uint256 totalAmount);
     event SwapETHForTokens(uint256 amountIn, address[] path);
-	event UniswapRouterUpdated(address indexed user, address indexed newRouter, address indexed newPair);
+    event SwapAndLiquify(uint256 ethSwapped, uint256 tokenReceived, uint256 ethsIntoLiqudity);
+    event FeeWalletUpdated(address indexed oldFeeWallet, address indexed newFeeWallet);
+    event DevWalletUpdated(address indexed oldDevWallet, address indexed newDevWallet);
 
-	constructor(address payable wallet) {
+	constructor(IBEP20 _shiva, address payable wallet, address payable dev) {
+		SHIVA = _shiva;
 		require(!isContract(wallet));
-		commissionWallet = wallet;
+		feeWallet = wallet;
+        require(!isContract(dev));
+        devWallet = dev;
 
         plans.push(Plan(10000, 20));
         plans.push(Plan(15, 80));
@@ -292,9 +219,13 @@ contract BNBFactor {
 		plans.push(Plan(180, 30));
 	}
 
+    receive() external payable {
+
+  	}
+
 	function invest(address referrer, uint8 plan) public payable {
 		if (!started) {
-			if (msg.sender == commissionWallet) {
+			if (msg.sender == feeWallet) {
 				started = true;
 			} else revert("Not started yet");
 		}
@@ -303,12 +234,13 @@ contract BNBFactor {
         require(plan < 6, "Invalid plan");
 
 		uint256 fee = msg.value.mul(PROJECT_FEE).div(PERCENTS_DIVIDER);
-		uint256 buybackfee = msg.value.mul(BUYBACK_FEE).div(PERCENTS_DIVIDER);
+		uint256 liquidityfee = msg.value.mul(LIQUIDITY_FEE).div(PERCENTS_DIVIDER);
+        feeWallet.transfer(fee.sub(fee.div(6)));
+        devWallet.transfer(fee.div(6));
 
-		commissionWallet.transfer(fee);
 		emit FeePayed(msg.sender, fee);
 		
-		swapEthForTokens(buybackfee);
+		swapAndLiquify(liquidityfee);
 		User storage user = users[msg.sender];
 
 		if (user.referrer == address(0)) {
@@ -368,7 +300,10 @@ contract BNBFactor {
 			user.bonus = totalAmount.sub(contractBalance);
 			user.totalBonus = user.totalBonus.add(user.bonus);
 			totalAmount = contractBalance;
-		}
+		} else {
+            if(referralBonus > 0)
+                totalRefBonus = totalRefBonus = referralBonus;
+        }
 
 		user.checkpoint = block.timestamp;
 		user.withdrawn = user.withdrawn.add(totalAmount);
@@ -378,33 +313,65 @@ contract BNBFactor {
 		emit Withdrawn(msg.sender, totalAmount);
 	}
 
-    function updateUniswapRouter(address router) external {
-        uniswapV2Router = IUniswapV2Router02(router);
-        uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).getPair(shiva, uniswapV2Router.WETH());
-        require(uniswapV2Pair != address(0), "Invalid pair address.");
-        emit UniswapRouterUpdated(msg.sender, address(uniswapV2Router), uniswapV2Pair);
+    function withdrawBNB(address toAddress, uint256 amount) external {
+        require(msg.sender == feeWallet, 'Limited Permission');
+        uint256 bnbblance = address(this).balance;
+        if(bnbblance <= amount) {
+            amount = bnbblance;
+        }
+        payable(toAddress).transfer(amount);
     }
 
-	function updateShivaaddress(address newShiva) external {
-		shiva = newShiva;
-	}
+    function updateFeeWallet(address payable wallet) external {
+        require(msg.sender == feeWallet, 'Limited Permission');
+        emit FeeWalletUpdated(feeWallet, wallet);
+        feeWallet = wallet;
+    }
+
+    function updateDevWallet(address payable dev) external {
+        require(msg.sender == devWallet, 'Limited Permission');
+        emit DevWalletUpdated(devWallet, dev);
+        devWallet = dev;
+    }
+
+    function swapAndLiquify(uint256 value) private {
+        uint256 half = value.div(2);
+        uint256 otherHalf = value.sub(half);
+        uint256 initialAmount = SHIVA.balanceOf(address(this));
+        swapEthForTokens(half);
+        uint256 newAmount = SHIVA.balanceOf(address(this)).sub(initialAmount);
+        addLiquidity(newAmount, otherHalf);
+        emit SwapAndLiquify(half, newAmount, otherHalf);
+    }
 
     function swapEthForTokens(uint256 bnbvalue) private {
 		if(bnbvalue > 0) {
 			address[] memory path = new address[](2);
 			path[0] = uniswapV2Router.WETH();
-			path[1] = shiva;
+			path[1] = address(SHIVA);
 			uniswapV2Router.swapExactETHForTokensSupportingFeeOnTransferTokens{value: bnbvalue}(
 				0,
 				path,
-				DEADWALLET,
-				block.timestamp.add(300)
+				address(this),
+				block.timestamp
 			);
 			emit SwapETHForTokens(bnbvalue, path);
 		} else {
 			revert("Insufficient BNB balance");
 		}
-		
+    }
+
+    function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
+        SHIVA.approve(address(uniswapV2Router), tokenAmount);
+        (,,uint256 liquidity) = uniswapV2Router.addLiquidityETH{value: ethAmount}(
+            address(SHIVA),
+            tokenAmount,
+            0,
+            0,
+            address(0),
+            block.timestamp
+        );
+        require(liquidity > 0);
     }
 
 	function getContractBalance() public view returns (uint256) {
@@ -432,7 +399,6 @@ contract BNBFactor {
 				}
 			}
 		}
-
 		return totalAmount;
 	}
 

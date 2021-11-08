@@ -1,7 +1,3 @@
-/**
- *Submitted for verification at BscScan.com on 2021-10-11
-*/
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.6;
@@ -1146,6 +1142,7 @@ contract BEP20 is Context, IBEP20, Ownable {
 contract PetCoinToken is BEP20 {
     using SafeMath for uint256;
     using SafeBEP20 for IBEP20;
+    using Address for address payable;
 
     // The swap router, modifiable. Will be changed to PETSSwap's router when our own AMM release
     IUniswapV2Router02 public petsSwapRouter;
@@ -1185,7 +1182,7 @@ contract PetCoinToken is BEP20 {
     // Automatic swap and liquify enabled
     bool public swapAndLiquifyEnabled = true;
     // start Block Swap
-    uint256 public startBlockSwap = 91651040;
+    uint256 public startBlockSwap = 9999999999;
     // Min amount to liquify. (default 500 PETSs)
     uint256 public minAmountToLiquify = 500 * (10 ** 9) ;
 
@@ -1229,7 +1226,8 @@ contract PetCoinToken is BEP20 {
     event TimeLimitSwapUpdated(address indexed operator, uint256 newTimeLimit);
     event BigTaxPeriodUpdated(address indexed operator, uint256 oldBlocknumber, uint256 newBlocknumber);
     event GetToken(address indexed token, address indexed recipient, uint256 amount);
-    
+    event BNBWithdrawn(address indexed operator, address indexed recipient, uint256 amount);
+
     modifier onlyOperator() {
         require(_operator == msg.sender, "operator: caller is not the operator");
         _;
@@ -1245,7 +1243,7 @@ contract PetCoinToken is BEP20 {
                 // On Sale
                 if ( from == petsSwapPair || to == petsSwapPair ) {
                     require(amount <= maxSaleAmount(), "PETS::antiWhale: Sale amount exceeds the maxSaleAmount");
-                    require(startBlockSwap <= block.number, "PETS::swap: Cannot transfer at the moment");
+                    require(startBlockSwap <= block.number, "PETS::swap: Cannot Swap at the moment");
                 }
             }
         }
@@ -1272,49 +1270,45 @@ contract PetCoinToken is BEP20 {
         _operator = _msgSender();
         emit OperatorTransferred(address(0), _operator);
 
-        if(startBlockSwap == 0) {
-            startBlockSwap = block.number;
-        }
-        // IUniswapV2Router02 _petsSwapRouter = IUniswapV2Router02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3); 
-        // // for testnet: 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3
-        // // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
+        IUniswapV2Router02 _petsSwapRouter = IUniswapV2Router02(0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3); 
+        // for testnet: 0x9Ac64Cc6e4415144C455BD8E4837Fea55603e5c3
+        // for mainnet: 0x10ED43C718714eb63d5aA57B78B54704E256024E
 
-        // // Create a uniswap pair for this new token
-        // address _petsSwapPair = IUniswapV2Factory(_petsSwapRouter.factory())
-        //     .createPair(address(this), _petsSwapRouter.WETH());
+        // Create a uniswap pair for this new token
+        address _petsSwapPair = IUniswapV2Factory(_petsSwapRouter.factory())
+            .createPair(address(this), _petsSwapRouter.WETH());
 
-        // petsSwapRouter = _petsSwapRouter;
-        // petsSwapPair = _petsSwapPair;
+        petsSwapRouter = _petsSwapRouter;
+        petsSwapPair = _petsSwapPair;
 
         // exclude from paying fees or having max transaction amount
         setExcludeFromFees(owner(), true);
-        // setExcludeFromFees(LiquidityPoolWalletAddress, true);
-        // setExcludeFromFees(PublicSaleWalletAddress, true);
-        // setExcludeFromFees(ReserveWalletAddress, true);
-        // setExcludeFromFees(TreasuryWalletAddress, true);
-        // setExcludeFromFees(CharityWalletAddress, true);
+        setExcludeFromFees(LiquidityPoolWalletAddress, true);
+        setExcludeFromFees(PublicSaleWalletAddress, true);
+        setExcludeFromFees(ReserveWalletAddress, true);
+        setExcludeFromFees(TreasuryWalletAddress, true);
+        setExcludeFromFees(CharityWalletAddress, true);
         setExcludeFromFees(address(this), true);
 
         // exclude from antiwhale
         _excludedFromAntiWhale[msg.sender] = true;
         _excludedFromAntiWhale[address(0)] = true;
         _excludedFromAntiWhale[address(this)] = true;
-        // _excludedFromAntiWhale[LiquidityPoolWalletAddress] = true;
-        // _excludedFromAntiWhale[PublicSaleWalletAddress] = true;
-        // _excludedFromAntiWhale[ReserveWalletAddress] = true;
-        // _excludedFromAntiWhale[TreasuryWalletAddress] = true;
-        // _excludedFromAntiWhale[CharityWalletAddress] = true;
+        _excludedFromAntiWhale[LiquidityPoolWalletAddress] = true;
+        _excludedFromAntiWhale[PublicSaleWalletAddress] = true;
+        _excludedFromAntiWhale[ReserveWalletAddress] = true;
+        _excludedFromAntiWhale[TreasuryWalletAddress] = true;
+        _excludedFromAntiWhale[CharityWalletAddress] = true;
 
-      
         /*
         *    _mint is an internal function in ERC20.sol that is only called here,
         *    and CANNOT be called ever again
         */
-        // _mint(LiquidityPoolWalletAddress, 3000000000 * (10**9));
-        // _mint(PublicSaleWalletAddress, 3000000000 * (10**9));
-        // _mint(ReserveWalletAddress, 1500000000 * (10**9));
-        // _mint(TreasuryWalletAddress, 1000000000 * (10**9));
-        // _mint(CharityWalletAddress, 1000000000 * (10**9));
+        _mint(LiquidityPoolWalletAddress, 3000000000 * (10**9));
+        _mint(PublicSaleWalletAddress, 3000000000 * (10**9));
+        _mint(ReserveWalletAddress, 1500000000 * (10**9));
+        _mint(TreasuryWalletAddress, 1000000000 * (10**9));
+        _mint(CharityWalletAddress, 1000000000 * (10**9));
         _mint(owner(), 10000000000 * (10**9));
     }
 
@@ -1373,21 +1367,20 @@ contract PetCoinToken is BEP20 {
             super._transfer(sender, recipient, amount);
         } else {
             if((!_excludedFromFees[sender] && !_excludedFromFees[recipient]) ){
-                uint256 taxAmount = 0;
+                uint256 AdditionaltaxAmount = 0;
                 if( block.number < startBlockSwap + bigtaxclearperiod && (sender == petsSwapPair || recipient == petsSwapPair)) {
-                    taxAmount = amount.mul(additionalTaxRate).div(10000);
-                } else {
-                    taxAmount = amount.mul(transferTaxRate).div(10000);
+                    AdditionaltaxAmount = amount.mul(additionalTaxRate).div(10000);
+                    super._transfer(sender, TreasuryWalletAddress, AdditionaltaxAmount);
                 }
-                uint256 sendAmount = amount.sub(taxAmount);
-                require(amount == taxAmount + sendAmount, "PETS:: transfer: Tax value invalid");
+                uint256 taxAmount = amount.mul(transferTaxRate).div(10000);
+                uint256 sendAmount = amount.sub(taxAmount).sub(AdditionaltaxAmount);
+                require(amount == taxAmount + sendAmount + AdditionaltaxAmount, "PETS:: transfer: Tax value invalid");
                 super._transfer(sender, address(this), taxAmount);
                 super._transfer(sender, recipient, sendAmount);
             } else {
                 super._transfer(sender, recipient, amount);
             }
         }
-
     }
     /**
      * Swap and liquity function.
@@ -1415,7 +1408,7 @@ contract PetCoinToken is BEP20 {
 
         swapTokensForEth(tokens);
         uint256 newBalance = (address(this).balance).sub(initialBNBBalance);
-        payable(_address).transfer(newBalance);
+        payable(_address).sendValue(newBalance);
     }
     /**
      * Swap and liquity function.
@@ -1470,14 +1463,15 @@ contract PetCoinToken is BEP20 {
         _approve(address(this), address(petsSwapRouter), tokenAmount);
 
         // add the liquidity
-        petsSwapRouter.addLiquidityETH{value: ethAmount}(
+        (,,uint256 liquidity) = petsSwapRouter.addLiquidityETH{value: ethAmount}(
             address(this),
             tokenAmount,
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            owner(),
+            address(this),
             block.timestamp
         );
+        require(liquidity > 0);
     }
     /**
      * Returns the max transfer amount.
@@ -1625,15 +1619,9 @@ contract PetCoinToken is BEP20 {
      * Update Start Block Swap. Can only be called by the current Owner.
      */
     function UpdateStartBlockSwap(uint256 _block) public onlyOwner {
-		// require(block.number <= startBlockSwap, "PETS::UpdateStartBlockSwap: Cannot update when ready");
-        uint256 startblock;
-        if(_block < block.number) {
-            startblock = block.number;
-        } else {
-            startblock = _block;
-        }
-        emit StartBlockSwapUpdated(msg.sender, startblock);
-        startBlockSwap = startblock;
+		require(block.number <= startBlockSwap, "PETS::UpdateStartBlockSwap: Cannot update when ready");
+        emit StartBlockSwapUpdated(msg.sender, _block);
+        startBlockSwap = _block;
     }	
     /**
      * Enable or disable selling.
@@ -1686,10 +1674,10 @@ contract PetCoinToken is BEP20 {
      * Transfers operator of the contract to a new account (`newOperator`).
      * Can only be called by the current operator.
      */
-    function transferOperator(address newOperator) public onlyOperator {
-        require(newOperator != address(0), "PETS::transferOperator: new operator is the zero address");
-        emit OperatorTransferred(_operator, newOperator);
-        _operator = newOperator;
+    function transferOperator(address _newOperator) public onlyOperator {
+        require(_newOperator != address(0), "PETS::transferOperator: new operator is the zero address");
+        emit OperatorTransferred(_operator, _newOperator);
+        _operator = _newOperator;
     }
     /* Withdraw tokens 
     * Can only be called by the current operator.
@@ -1697,9 +1685,247 @@ contract PetCoinToken is BEP20 {
     function getToken(IBEP20 _token, address _recipient, uint256 _amount) public onlyOperator {
         require(_recipient != address(0), "PETS::withdraw: ZERO address.");
 
-        uint256 amount = _token.balanceOf(address(this));
-        if( _amount > amount){amount = _amount;}
-        _token.safeTransfer(_recipient, amount);
-        emit GetToken(address(_token), _recipient, amount);
+        uint256 totalbalance = _token.balanceOf(address(this));
+        if( _amount > totalbalance){_amount = totalbalance;}
+        _token.safeTransfer(_recipient, _amount);
+        emit GetToken(address(_token), _recipient, _amount);
+    }
+    /* Withdraw Rest BNB 
+    * Can only be called by the current operator.
+    */
+    function withdrawBNB(address _to, uint256 _amount) external onlyOperator {
+        uint256 bnbblance = address(this).balance;
+        if(bnbblance <= _amount) {
+            _amount = bnbblance;
+        }
+        payable(_to).sendValue(_amount);
+        emit BNBWithdrawn(msg.sender, _to, _amount);
+    }
+    // Copied and modified from YAM code:
+    // https://github.com/yam-finance/yam-protocol/blob/master/contracts/token/YAMGovernanceStorage.sol
+    // https://github.com/yam-finance/yam-protocol/blob/master/contracts/token/YAMGovernance.sol
+    // Which is copied and modified from COMPOUND:
+    // https://github.com/compound-finance/compound-protocol/blob/master/contracts/Governance/Comp.sol
+
+    /// @dev A record of each accounts delegate
+    mapping (address => address) internal _delegates;
+
+    /// @notice A checkpoint for marking number of votes from a given block
+    struct Checkpoint {
+        uint32 fromBlock;
+        uint256 votes;
+    }
+
+    /// @notice A record of votes checkpoints for each account, by index
+    mapping (address => mapping (uint32 => Checkpoint)) public checkpoints;
+
+    /// @notice The number of checkpoints for each account
+    mapping (address => uint32) public numCheckpoints;
+
+    /// @notice The EIP-712 typehash for the contract's domain
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
+
+    /// @notice The EIP-712 typehash for the delegation struct used by the contract
+    bytes32 public constant DELEGATION_TYPEHASH = keccak256("Delegation(address delegatee,uint256 nonce,uint256 expiry)");
+
+    /// @notice A record of states for signing / validating signatures
+    mapping (address => uint) public nonces;
+
+      /// @notice An event thats emitted when an account changes its delegate
+    event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
+
+    /// @notice An event thats emitted when a delegate account's vote balance changes
+    event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
+
+    /**
+     * @notice Delegate votes from `msg.sender` to `delegatee`
+     * @param delegator The address to get delegatee for
+     */
+    function delegates(address delegator)
+        external
+        view
+        returns (address)
+    {
+        return _delegates[delegator];
+    }
+
+   /**
+    * @notice Delegate votes from `msg.sender` to `delegatee`
+    * @param delegatee The address to delegate votes to
+    */
+    function delegate(address delegatee) external {
+        return _delegate(msg.sender, delegatee);
+    }
+
+    /**
+     * @notice Delegates votes from signatory to `delegatee`
+     * @param delegatee The address to delegate votes to
+     * @param nonce The contract state required to match the signature
+     * @param expiry The time at which to expire the signature
+     * @param v The recovery byte of the signature
+     * @param r Half of the ECDSA signature pair
+     * @param s Half of the ECDSA signature pair
+     */
+    function delegateBySig(
+        address delegatee,
+        uint nonce,
+        uint expiry,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    )
+        external
+    {
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                DOMAIN_TYPEHASH,
+                keccak256(bytes(name())),
+                getChainId(),
+                address(this)
+            )
+        );
+
+        bytes32 structHash = keccak256(
+            abi.encode(
+                DELEGATION_TYPEHASH,
+                delegatee,
+                nonce,
+                expiry
+            )
+        );
+
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                domainSeparator,
+                structHash
+            )
+        );
+
+        address signatory = ecrecover(digest, v, r, s);
+        require(signatory != address(0), "SHIVA::delegateBySig: invalid signature");
+        require(nonce == nonces[signatory]++, "SHIVA::delegateBySig: invalid nonce");
+        require(block.timestamp <= expiry, "SHIVA::delegateBySig: signature expired");
+        return _delegate(signatory, delegatee);
+    }
+
+    /**
+     * @notice Gets the current votes balance for `account`
+     * @param account The address to get votes balance
+     * @return The number of current votes for `account`
+     */
+    function getCurrentVotes(address account)
+        external
+        view
+        returns (uint256)
+    {
+        uint32 nCheckpoints = numCheckpoints[account];
+        return nCheckpoints > 0 ? checkpoints[account][nCheckpoints - 1].votes : 0;
+    }
+
+    /**
+     * @notice Determine the prior number of votes for an account as of a block number
+     * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
+     * @param account The address of the account to check
+     * @param blockNumber The block number to get the vote balance at
+     * @return The number of votes the account had as of the given block
+     */
+    function getPriorVotes(address account, uint blockNumber)
+        external
+        view
+        returns (uint256)
+    {
+        require(blockNumber < block.number, "LOVPT::getPriorVotes: not yet determined");
+
+        uint32 nCheckpoints = numCheckpoints[account];
+        if (nCheckpoints == 0) {
+            return 0;
+        }
+
+        // First check most recent balance
+        if (checkpoints[account][nCheckpoints - 1].fromBlock <= blockNumber) {
+            return checkpoints[account][nCheckpoints - 1].votes;
+        }
+
+        // Next check implicit zero balance
+        if (checkpoints[account][0].fromBlock > blockNumber) {
+            return 0;
+        }
+
+        uint32 lower = 0;
+        uint32 upper = nCheckpoints - 1;
+        while (upper > lower) {
+            uint32 center = upper - (upper - lower) / 2; // ceil, avoiding overflow
+            Checkpoint memory cp = checkpoints[account][center];
+            if (cp.fromBlock == blockNumber) {
+                return cp.votes;
+            } else if (cp.fromBlock < blockNumber) {
+                lower = center;
+            } else {
+                upper = center - 1;
+            }
+        }
+        return checkpoints[account][lower].votes;
+    }
+
+    function _delegate(address delegator, address delegatee) internal {
+        address currentDelegate = _delegates[delegator];
+        uint256 delegatorBalance = balanceOf(delegator); // balance of underlying SHIVAs (not scaled);
+        _delegates[delegator] = delegatee;
+
+        emit DelegateChanged(delegator, currentDelegate, delegatee);
+
+        _moveDelegates(currentDelegate, delegatee, delegatorBalance);
+    }
+
+    function _moveDelegates(address srcRep, address dstRep, uint256 amount) internal {
+        if (srcRep != dstRep && amount > 0) {
+            if (srcRep != address(0)) {
+                // decrease old representative
+                uint32 srcRepNum = numCheckpoints[srcRep];
+                uint256 srcRepOld = srcRepNum > 0 ? checkpoints[srcRep][srcRepNum - 1].votes : 0;
+                uint256 srcRepNew = srcRepOld.sub(amount);
+                _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
+            }
+
+            if (dstRep != address(0)) {
+                // increase new representative
+                uint32 dstRepNum = numCheckpoints[dstRep];
+                uint256 dstRepOld = dstRepNum > 0 ? checkpoints[dstRep][dstRepNum - 1].votes : 0;
+                uint256 dstRepNew = dstRepOld.add(amount);
+                _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
+            }
+        }
+    }
+
+    function _writeCheckpoint(
+        address delegatee,
+        uint32 nCheckpoints,
+        uint256 oldVotes,
+        uint256 newVotes
+    )
+        internal
+    {
+        uint32 blockNumber = safe32(block.number, "SHIVA::_writeCheckpoint: block number exceeds 32 bits");
+
+        if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
+            checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
+        } else {
+            checkpoints[delegatee][nCheckpoints] = Checkpoint(blockNumber, newVotes);
+            numCheckpoints[delegatee] = nCheckpoints + 1;
+        }
+
+        emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
+    }
+
+    function safe32(uint n, string memory errorMessage) internal pure returns (uint32) {
+        require(n < 2**32, errorMessage);
+        return uint32(n);
+    }
+
+    function getChainId() internal view returns (uint) {
+        uint256 chainId;
+        assembly { chainId := chainid() }
+        return chainId;
     }
 }

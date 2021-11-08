@@ -682,7 +682,7 @@ contract ExchangeWithNewShiva is Ownable {
     using SafeBEP20 for IBEP20;
     using SafeMath for uint256;
     
-    uint256 public addedRate = 200000;
+    uint256 public addedRate = 220000;
     uint256 public timelimt = 28800; /* 24hrs */
     address public deadWallet = 0x000000000000000000000000000000000000dEaD;
 

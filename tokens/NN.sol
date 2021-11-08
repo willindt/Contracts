@@ -1208,13 +1208,16 @@ contract NNToken is ERC20, Ownable {
 
     mapping(address => bool) public _isBlacklisted;
 
-    uint256 public BNBRewardsFee = 4;
-    uint256 public liquidityFee = 3;
-    uint256 public marketingFee = 1;
-    uint256 public charityFee = 1;
-    uint256 public burnFee = 1;
+    uint256 public sBNBRewardsFee = 40;
+    uint256 public sliquidityFee = 30;
+    uint256 public smarketingFee = 10;
+    uint256 public scharityFee = 10;
+    uint256 public sburnFee = 10;
 
-    uint256 public totalFees = BNBRewardsFee.add(liquidityFee).add(marketingFee).add(charityFee);
+    uint256 public tburnFee = 5;
+    uint256 public tBNBRewardsFee = 5;
+
+    uint256 public stotalFees = sBNBRewardsFee.add(sliquidityFee).add(smarketingFee).add(scharityFee);
 
     address payable public _marketingWalletAddress = 0x58c7F90Cd297471B6561F39591f7388BAf7Ad0c3;
     address payable public _charityWalletAddress = 0x78bF011E39f3D2807aFA890b8fd5b978aD04d325;
@@ -1525,13 +1528,13 @@ contract NNToken is ERC20, Ownable {
         ) {
             swapping = true;
 
-            uint256 marketingTokens = contractTokenBalance.mul(marketingFee).div(totalFees);
+            uint256 marketingTokens = contractTokenBalance.mul(smarketingFee).div(stotalFees);
             swapAndSendToFee(marketingTokens, _marketingWalletAddress);
 
-            uint256 charityTokens = contractTokenBalance.mul(charityFee).div(totalFees);
+            uint256 charityTokens = contractTokenBalance.mul(scharityFee).div(stotalFees);
             swapAndSendToFee(charityTokens, _charityWalletAddress);
 
-            uint256 swapTokens = contractTokenBalance.mul(liquidityFee).div(totalFees);
+            uint256 swapTokens = contractTokenBalance.mul(sliquidityFee).div(stotalFees);
             swapAndLiquify(swapTokens);
 
             uint256 sellTokens = balanceOf(address(this));
@@ -1549,10 +1552,14 @@ contract NNToken is ERC20, Ownable {
         }
 
         if(takeFee) {
-        	uint256 fees = amount.mul(totalFees).div(100);
-            uint256 burnfees = amount.mul(burnFee).div(100);
-        	if(automatedMarketMakerPairs[to] && amount > maxSellAmount()){
-        	    fees += amount.mul(2).div(100);
+        	uint256 fees = amount.mul(tBNBRewardsFee).div(1000);
+            uint256 burnfees = amount.mul(tburnFee).div(1000);
+        	if(automatedMarketMakerPairs[to] || automatedMarketMakerPairs[from] ){
+        	    fees += amount.mul(stotalFees-tBNBRewardsFee).div(1000);
+                burnfees += amount.mul(sburnFee - tburnFee).div(1000);
+                if(automatedMarketMakerPairs[to] && amount > maxSellAmount()){
+                    fees += amount.mul(20).div(1000);
+                }
         	}
         	amount = amount.sub(fees).sub(burnfees);
             super._transfer(from, deadWallet, burnfees);
