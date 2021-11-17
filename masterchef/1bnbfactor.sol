@@ -1,166 +1,20 @@
+/**
+ *Submitted for verification at BscScan.com on 2021-11-12
+*/
+
 // SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.4;
-
-interface IBEP20 {
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
-
-interface IUniswapV2Router01 {
-
-    function factory() external pure returns (address);
-    function WETH() external pure returns (address);
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint amountADesired,
-        uint amountBDesired,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
-    ) external returns (uint amountA, uint amountB, uint liquidity);
-    function addLiquidityETH(
-        address token,
-        uint amountTokenDesired,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    ) external payable returns (uint amountToken, uint amountETH, uint liquidity);
-    function removeLiquidity(
-        address tokenA,
-        address tokenB,
-        uint liquidity,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline
-    ) external returns (uint amountA, uint amountB);
-    function removeLiquidityETH(
-        address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    ) external returns (uint amountToken, uint amountETH);
-    function removeLiquidityWithPermit(
-        address tokenA,
-        address tokenB,
-        uint liquidity,
-        uint amountAMin,
-        uint amountBMin,
-        address to,
-        uint deadline,
-        bool approveMax, uint8 v, bytes32 r, bytes32 s
-    ) external returns (uint amountA, uint amountB);
-    function removeLiquidityETHWithPermit(
-        address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline,
-        bool approveMax, uint8 v, bytes32 r, bytes32 s
-    ) external returns (uint amountToken, uint amountETH);
-    function swapExactTokensForTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
-    function swapTokensForExactTokens(
-        uint amountOut,
-        uint amountInMax,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external returns (uint[] memory amounts);
-    function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline)
-        external
-        payable
-        returns (uint[] memory amounts);
-    function swapTokensForExactETH(uint amountOut, uint amountInMax, address[] calldata path, address to, uint deadline)
-        external
-        returns (uint[] memory amounts);
-    function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline)
-        external
-        returns (uint[] memory amounts);
-    function swapETHForExactTokens(uint amountOut, address[] calldata path, address to, uint deadline)
-        external
-        payable
-        returns (uint[] memory amounts);
-    function quote(uint amountA, uint reserveA, uint reserveB) external pure returns (uint amountB);
-    function getAmountOut(uint amountIn, uint reserveIn, uint reserveOut) external pure returns (uint amountOut);
-    function getAmountIn(uint amountOut, uint reserveIn, uint reserveOut) external pure returns (uint amountIn);
-    function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
-    function getAmountsIn(uint amountOut, address[] calldata path) external view returns (uint[] memory amounts);
-}
-
-interface IUniswapV2Router02 is IUniswapV2Router01 {
-
-    function removeLiquidityETHSupportingFeeOnTransferTokens(
-        address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline
-    ) external returns (uint amountETH);
-    function removeLiquidityETHWithPermitSupportingFeeOnTransferTokens(
-        address token,
-        uint liquidity,
-        uint amountTokenMin,
-        uint amountETHMin,
-        address to,
-        uint deadline,
-        bool approveMax, uint8 v, bytes32 r, bytes32 s
-    ) external returns (uint amountETH);
-    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external;
-    function swapExactETHForTokensSupportingFeeOnTransferTokens(
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external payable;
-    function swapExactTokensForETHSupportingFeeOnTransferTokens(
-        uint amountIn,
-        uint amountOutMin,
-        address[] calldata path,
-        address to,
-        uint deadline
-    ) external;
-}
 
 contract Morebnb {
 	using SafeMath for uint256;
 	
-	uint256 constant public INVEST_MIN_AMOUNT = 5e16; // 0.05 bnb
+    uint256 constant public INVEST_MIN_AMOUNT = 5e16; // 0.05 bnb
+    uint256 constant public WITHDRAW_MAX_PER_DAY_AMOUNT = 50e18; // 50 bnb per day
 	uint256[] public REFERRAL_PERCENTS = [70, 30, 15, 10, 5];
 	uint256 constant public PROJECT_FEE = 120;
-	uint256 constant public LIQUIDITY_FEE = 30;
+	uint256 constant public DEV_FEE = 30;
 	uint256 constant public PERCENT_STEP = 5;
 	uint256 constant public PERCENTS_DIVIDER = 1000;
 	uint256 constant public TIME_STEP = 1 days;
-
-    IUniswapV2Router02 public uniswapV2Router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
-	IBEP20 public SHIVA;
 
 	uint256 public totalInvested;
 	uint256 public totalRefBonus;
@@ -186,6 +40,8 @@ contract Morebnb {
 		uint256 bonus;
 		uint256 totalBonus;
 		uint256 withdrawn;
+        uint256 firstwithdrawntime;
+        uint256 daywithdrawnamount;
 	}
 
 	mapping (address => User) internal users;
@@ -196,6 +52,7 @@ contract Morebnb {
 
 	event Newbie(address user);
 	event NewDeposit(address indexed user, uint8 plan, uint256 amount);
+    event ReInvest(address indexed user, uint8 plan, uint256 amount);
 	event Withdrawn(address indexed user, uint256 amount);
 	event RefBonus(address indexed referrer, address indexed referral, uint256 indexed level, uint256 amount);
 	event FeePayed(address indexed user, uint256 totalAmount);
@@ -204,14 +61,12 @@ contract Morebnb {
     event FeeWalletUpdated(address indexed oldFeeWallet, address indexed newFeeWallet);
     event DevWalletUpdated(address indexed oldDevWallet, address indexed newDevWallet);
 
-	constructor(IBEP20 _shiva, address payable wallet, address payable dev) {
-		SHIVA = _shiva;
+	constructor(address payable wallet, address payable dev) {
 		require(!isContract(wallet));
 		feeWallet = wallet;
         require(!isContract(dev));
         devWallet = dev;
 
-        plans.push(Plan(10000, 20));
         plans.push(Plan(15, 80));
         plans.push(Plan(30, 56));
         plans.push(Plan(60, 38));
@@ -231,16 +86,15 @@ contract Morebnb {
 		}
 
 		require(msg.value >= INVEST_MIN_AMOUNT);
-        require(plan < 6, "Invalid plan");
-
+        require(plan < 5, "Invalid plan");
+        
 		uint256 fee = msg.value.mul(PROJECT_FEE).div(PERCENTS_DIVIDER);
-		uint256 liquidityfee = msg.value.mul(LIQUIDITY_FEE).div(PERCENTS_DIVIDER);
-        feeWallet.transfer(fee.sub(fee.div(6)));
-        devWallet.transfer(fee.div(6));
+        feeWallet.transfer(fee);
+        uint256 devfee = msg.value.mul(DEV_FEE).div(PERCENTS_DIVIDER);
+        devWallet.transfer(devfee);
 
-		emit FeePayed(msg.sender, fee);
-		
-		swapAndLiquify(liquidityfee);
+		emit FeePayed(msg.sender, fee.add(devfee));
+
 		User storage user = users[msg.sender];
 
 		if (user.referrer == address(0)) {
@@ -298,27 +152,42 @@ contract Morebnb {
 		uint256 contractBalance = address(this).balance;
 		if (contractBalance < totalAmount) {
 			user.bonus = totalAmount.sub(contractBalance);
-			user.totalBonus = user.totalBonus.add(user.bonus);
 			totalAmount = contractBalance;
 		} else {
             if(referralBonus > 0)
-                totalRefBonus = totalRefBonus = referralBonus;
+                totalRefBonus = totalRefBonus.add(referralBonus);
+        }
+        
+        if(block.timestamp - user.firstwithdrawntime <= TIME_STEP) {
+            require(user.daywithdrawnamount < WITHDRAW_MAX_PER_DAY_AMOUNT, "Exceed max withdrawn amount today");            
+
+            if(user.daywithdrawnamount.add(totalAmount) > WITHDRAW_MAX_PER_DAY_AMOUNT) {
+                uint256 additionalBonus = user.daywithdrawnamount.add(totalAmount).sub(WITHDRAW_MAX_PER_DAY_AMOUNT);
+                user.bonus = user.bonus.add(additionalBonus);
+                totalAmount = WITHDRAW_MAX_PER_DAY_AMOUNT.sub(user.daywithdrawnamount);
+            }
+            user.daywithdrawnamount = user.daywithdrawnamount.add(totalAmount);
+        } else {
+            if(totalAmount > WITHDRAW_MAX_PER_DAY_AMOUNT) {
+                uint256 additionalBonus = totalAmount.sub(WITHDRAW_MAX_PER_DAY_AMOUNT);
+                user.bonus = user.bonus.add(additionalBonus);
+                totalAmount = WITHDRAW_MAX_PER_DAY_AMOUNT;                
+            }
+            user.firstwithdrawntime = block.timestamp;
+            user.daywithdrawnamount = totalAmount;
         }
 
 		user.checkpoint = block.timestamp;
 		user.withdrawn = user.withdrawn.add(totalAmount);
-
 		payable(msg.sender).transfer(totalAmount);
-
 		emit Withdrawn(msg.sender, totalAmount);
 	}
 
     function reinvest(uint8 plan) public {
-		User storage user = users[msg.sender];
+        User storage user = users[msg.sender];
 
 		uint256 totalAmount = getUserDividends(msg.sender);
 		uint256 referralBonus = getUserReferralBonus(msg.sender);
-
 		if (referralBonus > 0) {
 			user.bonus = 0;
 			totalAmount = totalAmount.add(referralBonus);
@@ -329,77 +198,51 @@ contract Morebnb {
 		uint256 contractBalance = address(this).balance;
 		if (contractBalance < totalAmount) {
 			user.bonus = totalAmount.sub(contractBalance);
-			user.totalBonus = user.totalBonus.add(user.bonus);
 			totalAmount = contractBalance;
 		} else {
             if(referralBonus > 0)
-                totalRefBonus = totalRefBonus + referralBonus;
+                totalRefBonus = totalRefBonus = referralBonus;
         }
 
-		user.checkpoint = block.timestamp;
 		user.withdrawn = user.withdrawn.add(totalAmount);
 
-		emit Withdrawn(msg.sender, totalAmount);
+        require(totalAmount >= INVEST_MIN_AMOUNT);
+
+		uint256 fee = totalAmount.mul(PROJECT_FEE).div(PERCENTS_DIVIDER);
+        feeWallet.transfer(fee);
+        uint256 devfee = totalAmount.mul(DEV_FEE).div(PERCENTS_DIVIDER);
+        devWallet.transfer(devfee);
+
+		emit FeePayed(msg.sender, fee.add(devfee));
 
 
-		require(totalAmount >= INVEST_MIN_AMOUNT);
-        require(plan < 6, "Invalid plan");
-
-		uint256 fee = msg.value.mul(PROJECT_FEE).div(PERCENTS_DIVIDER);
-		uint256 liquidityfee = msg.value.mul(LIQUIDITY_FEE).div(PERCENTS_DIVIDER);
-        feeWallet.transfer(fee.sub(fee.div(6)));
-        devWallet.transfer(fee.div(6));
-
-		emit FeePayed(msg.sender, fee);
-		
-		swapAndLiquify(liquidityfee);
-
-		if (user.referrer == address(0)) {
-			if (users[referrer].deposits.length > 0 && referrer != msg.sender) {
-				user.referrer = referrer;
-			}
-
-			address upline = user.referrer;
-			for (uint256 i = 0; i < 5; i++) {
-				if (upline != address(0)) {
-					users[upline].levels[i] = users[upline].levels[i].add(1);
-					upline = users[upline].referrer;
-				} else break;
-			}
-		}
-
-		if (user.referrer != address(0)) {
-			address upline = user.referrer;
-			for (uint256 i = 0; i < 5; i++) {
-				if (upline != address(0)) {
-					uint256 amount = msg.value.mul(REFERRAL_PERCENTS[i]).div(PERCENTS_DIVIDER);
-					users[upline].bonus = users[upline].bonus.add(amount);
-					users[upline].totalBonus = users[upline].totalBonus.add(amount);
-					emit RefBonus(upline, msg.sender, i, amount);
-					upline = users[upline].referrer;
-				} else break;
-			}
-		}
-
-		if (user.deposits.length == 0) {
-			user.checkpoint = block.timestamp;
-			emit Newbie(msg.sender);
-		}
-
-		user.deposits.push(Deposit(plan, msg.value, block.timestamp));
-
-		totalInvested = totalInvested.add(msg.value);
-
-		emit NewDeposit(msg.sender, plan, msg.value);
+		user.deposits.push(Deposit(plan, totalAmount, block.timestamp));
+		totalInvested = totalInvested.add(totalAmount);
+        user.checkpoint = block.timestamp;
+		emit ReInvest(msg.sender, plan, totalAmount);
     }
 
-    function withdrawBNB(address toAddress, uint256 amount) external {
-        require(msg.sender == feeWallet, 'Limited Permission');
-        uint256 bnbblance = address(this).balance;
-        if(bnbblance <= amount) {
-            amount = bnbblance;
+    function canHarvest(address userAddress) public view returns(bool) {
+        User storage user = users[userAddress];
+
+        if(block.timestamp - user.firstwithdrawntime <= TIME_STEP){
+            return user.daywithdrawnamount < WITHDRAW_MAX_PER_DAY_AMOUNT;
+        } else {
+            return true;
         }
-        payable(toAddress).transfer(amount);
+    }
+
+    function canReinvest(address userAddress) public view returns(bool) {
+		uint256 totalAmount = getUserDividends(userAddress);
+		uint256 referralBonus = getUserReferralBonus(userAddress);
+		if (referralBonus > 0) 
+			totalAmount = totalAmount.add(referralBonus);
+
+		uint256 contractBalance = address(this).balance;
+		if (contractBalance < totalAmount)
+			totalAmount = contractBalance;
+
+        return (totalAmount >= INVEST_MIN_AMOUNT);
     }
 
     function updateFeeWallet(address payable wallet) external {
@@ -412,46 +255,6 @@ contract Morebnb {
         require(msg.sender == devWallet, 'Limited Permission');
         emit DevWalletUpdated(devWallet, dev);
         devWallet = dev;
-    }
-
-    function swapAndLiquify(uint256 value) private {
-        uint256 half = value.div(2);
-        uint256 otherHalf = value.sub(half);
-        uint256 initialAmount = SHIVA.balanceOf(address(this));
-        swapEthForTokens(half);
-        uint256 newAmount = SHIVA.balanceOf(address(this)).sub(initialAmount);
-        addLiquidity(newAmount, otherHalf);
-        emit SwapAndLiquify(half, newAmount, otherHalf);
-    }
-
-    function swapEthForTokens(uint256 bnbvalue) private {
-		if(bnbvalue > 0) {
-			address[] memory path = new address[](2);
-			path[0] = uniswapV2Router.WETH();
-			path[1] = address(SHIVA);
-			uniswapV2Router.swapExactETHForTokensSupportingFeeOnTransferTokens{value: bnbvalue}(
-				0,
-				path,
-				address(this),
-				block.timestamp
-			);
-			emit SwapETHForTokens(bnbvalue, path);
-		} else {
-			revert("Insufficient BNB balance");
-		}
-    }
-
-    function addLiquidity(uint256 tokenAmount, uint256 ethAmount) private {
-        SHIVA.approve(address(uniswapV2Router), tokenAmount);
-        (,,uint256 liquidity) = uniswapV2Router.addLiquidityETH{value: ethAmount}(
-            address(SHIVA),
-            tokenAmount,
-            0,
-            0,
-            address(0),
-            block.timestamp
-        );
-        require(liquidity > 0);
     }
 
 	function getContractBalance() public view returns (uint256) {
