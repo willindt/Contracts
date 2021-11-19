@@ -1,15 +1,3 @@
-/**
- *Submitted for verification at BscScan.com on 2021-09-13
-*/
-
-/**
- *Submitted for verification at BscScan.com on 2021-07-17
-*/
-
-/**
- *Submitted for verification at BscScan.com on 2021-04-23
-*/
-
 // SPDX-License-Identifier: MIT
 
 // File: @uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol
